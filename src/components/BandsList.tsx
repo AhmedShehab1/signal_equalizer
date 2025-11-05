@@ -34,7 +34,7 @@ export default function BandsList({ bands, onBandChange }: BandsListProps) {
               step="0.5"
               value={band.gain}
               onChange={(e) => handleSliderChange(band.id, e.target.value)}
-              orient="vertical"
+              className="vertical-slider"
             />
             <span className="gain-value">{band.gain.toFixed(1)} dB</span>
           </div>
