@@ -1,0 +1,130 @@
+.app {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+h1 {
+  text-align: center;
+  color: #646cff;
+  margin-bottom: 2rem;
+}
+
+.file-loader {
+  text-align: center;
+  margin: 2rem 0;
+}
+
+.file-loader button {
+  padding: 1rem 2rem;
+  font-size: 1.1rem;
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  margin: 2rem 0;
+  padding: 1.5rem;
+  background: #1a1a1a;
+  border-radius: 8px;
+}
+
+.playback-buttons {
+  display: flex;
+  gap: 1rem;
+}
+
+.seek-control {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  max-width: 600px;
+}
+
+.seek-control input[type="range"] {
+  flex: 1;
+}
+
+.mode-selector {
+  margin: 2rem 0;
+  padding: 1.5rem;
+  background: #1a1a1a;
+  border-radius: 8px;
+}
+
+.mode-selector h3 {
+  margin-top: 0;
+}
+
+.mode-buttons {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin: 1rem 0;
+}
+
+.mode-buttons button.active {
+  border-color: #646cff;
+}
+
+.bands-list {
+  margin: 2rem 0;
+  padding: 1.5rem;
+  background: #1a1a1a;
+  border-radius: 8px;
+}
+
+.bands-list h3 {
+  margin-top: 0;
+}
+
+.bands-container {
+  display: flex;
+  gap: 1.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.band-control {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.band-control label {
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.band-control input[type="range"] {
+  writing-mode: bt-lr;
+  -webkit-appearance: slider-vertical;
+  height: 150px;
+}
+
+.band-control .gain-value {
+  font-size: 0.85rem;
+  color: #888;
+}
+
+.waveform-viewer,
+.spectrogram-panel {
+  margin: 2rem 0;
+  padding: 1.5rem;
+  background: #1a1a1a;
+  border-radius: 8px;
+}
+
+.waveform-viewer h3,
+.spectrogram-panel h3 {
+  margin-top: 0;
+}
+
+canvas {
+  display: block;
+  max-width: 100%;
+}
