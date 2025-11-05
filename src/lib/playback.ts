@@ -67,7 +67,17 @@ export class AudioPlayback {
       this.audioContext.resume();
     }
 
-    // Create source node
+    // Stop existing source if any
+    if (this.sourceNode) {
+      try {
+        this.sourceNode.stop();
+        this.sourceNode.disconnect();
+      } catch {
+        // Ignore errors if already stopped
+      }
+    }
+
+    // Create new source node (required for each playback)
     this.sourceNode = this.audioContext.createBufferSource();
     this.sourceNode.buffer = this.buffer;
 

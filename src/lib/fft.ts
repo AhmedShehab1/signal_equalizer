@@ -22,7 +22,7 @@ export function fft(input: number[]): ComplexNumber[] {
   }
   
   // Ensure n is a power of 2
-  if (n % 2 !== 0) {
+  if (n <= 0 || (n & (n - 1)) !== 0) {
     throw new Error('FFT input length must be a power of 2');
   }
   

@@ -38,8 +38,14 @@ export default function WaveformViewer({ audioBuffer, currentTime = 0 }: Wavefor
     ctx.beginPath();
 
     for (let i = 0; i < width; i++) {
-      const min = Math.min(...Array.from({ length: step }, (_, j) => data[i * step + j] || 0));
-      const max = Math.max(...Array.from({ length: step }, (_, j) => data[i * step + j] || 0));
+      let min = 0;
+      let max = 0;
+      
+      for (let j = 0; j < step; j++) {
+        const value = data[i * step + j] || 0;
+        if (value < min) min = value;
+        if (value > max) max = value;
+      }
       
       const y1 = (1 + min) * amp;
       const y2 = (1 + max) * amp;
