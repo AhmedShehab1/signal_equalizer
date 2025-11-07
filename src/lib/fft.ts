@@ -1,12 +1,16 @@
 /**
  * Fast Fourier Transform implementation
- * Computes the FFT of a signal using the Cooley-Tukey algorithm
+ * Computes the FFT of a signal using the Cooley-Tukey algorithm (power-of-2)
  */
 
 export type Complex = {
   re: number;  // Real part
   im: number;  // Imaginary part
 };
+
+function isPowerOfTwo(n: number): boolean {
+  return n > 0 && (n & (n - 1)) === 0;
+}
 
 /**
  * Compute FFT of input signal
@@ -19,6 +23,10 @@ export function fft(x: Complex[]): Complex[] {
   // 1. Base case for the recursion
   if (N <= 1) {
     return x;
+  }
+
+  if (!isPowerOfTwo(N)) {
+    throw new Error(`fft: input length ${N} is not a power of 2`);
   }
 
   // 2. Divide
@@ -98,6 +106,9 @@ export function padToPowerOf2(signal: number[]): Complex[] {
 export function ifft(X: Complex[]): Complex[] {
   const N = X.length;
   if (N === 0) return [];
+  if (!isPowerOfTwo(N)) {
+    throw new Error(`ifft: input length ${N} is not a power of 2`);
+  }
 
   const X_conj = X.map(x => ({ re: x.re, im: -x.im }));
   const x_conj = fft(X_conj);
