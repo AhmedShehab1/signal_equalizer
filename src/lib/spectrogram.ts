@@ -3,7 +3,7 @@
  */
 
 import { stft, magnitudeToDb } from './stft';
-import { SpectrogramData } from '../model/types';
+import { SpectrogramData, BandSpec } from '../model/types';
 
 /**
  * Generate spectrogram data from audio signal
@@ -102,4 +102,42 @@ function getSpectrogramColor(value: number): { r: number; g: number; b: number }
   const b = Math.floor((1 - value) * 255);
   
   return { r, g, b };
+}
+
+export function buildGainVector(
+  bands: BandSpec[],
+  fftSize: number,
+  sampleRate: number
+): Float32Array {
+  // Only up to Nyquist (inclusive)
+  const nyquistBin = Math.floor(fftSize / 2);
+  const gainVector = new Float32Array(nyquistBin + 1);
+  gainVector.fill(1.0);
+
+  const binToFreq = (i: number) => (i * sampleRate) / fftSize;
+
+  for (let i = 0; i <= nyquistBin; i++) {
+    const freq = binToFreq(i);
+    let binGain = 1.0;
+
+    for (const band of bands) {
+      let inThisBand = false;
+
+      // Support multi-window bands
+      for (const window of band.windows) {
+        if (freq >= window.f_start_hz && freq <= window.f_end_hz) {
+          inThisBand = true;
+          break;
+        }
+      }
+
+      if (inThisBand) {
+        binGain *= band.scale; // product rule
+      }
+    }
+
+    gainVector[i] = binGain;
+  }
+
+  return gainVector;
 }
