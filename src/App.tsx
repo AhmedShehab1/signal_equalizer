@@ -17,12 +17,22 @@ import { FrequencyBand, EqualizerMode, PlaybackState, SpectrogramData, BandSpec,
 import './App.css';
 
 function App() {
-  const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
+  // Audio buffers: original (immutable) and processed (EQ output)
+  const [originalBuffer, setOriginalBuffer] = useState<AudioBuffer | null>(null);
+  const [processedBuffer, setProcessedBuffer] = useState<AudioBuffer | null>(null);
   const [fileName, setFileName] = useState<string>('');
   const [bands, setBands] = useState<FrequencyBand[]>([]);
   const [modes, setModes] = useState<EqualizerMode[]>([]);
   const [currentMode, setCurrentMode] = useState<string | null>(null);
-  const [spectrogramData, setSpectrogramData] = useState<SpectrogramData | null>(null);
+  
+  // Dual spectrograms: input and output
+  const [inputSpectrogramData, setInputSpectrogramData] = useState<SpectrogramData | null>(null);
+  const [outputSpectrogramData, setOutputSpectrogramData] = useState<SpectrogramData | null>(null);
+  
+  // Processing state
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [processingError, setProcessingError] = useState<string | null>(null);
+  
   const [playbackState, setPlaybackState] = useState<PlaybackState>({
     isPlaying: false,
     currentTime: 0,
@@ -32,71 +42,98 @@ function App() {
   const playbackRef = useRef<AudioPlayback>(new AudioPlayback());
   const animationFrameRef = useRef<number>();
 
-
-    // Map UI bands -> BandSpec (single window per band, dB -> linear scale)
+  // Map UI bands -> BandSpec (single window per band, dB -> linear scale)
   const toBandSpecs = (bs: FrequencyBand[]): BandSpec[] =>
     bs.map(b => ({
-      // gain is assumed dB; change if your UI uses linear scale
       scale: Math.pow(10, b.gain / 20),
       windows: [{ f_start_hz: b.range[0], f_end_hz: b.range[1] }],
     }));
 
-    // Recompute output via STFT-domain EQ and load into the player
+  // STFT-domain EQ processing pipeline
   const recomputeWithSTFTEQ = async (
     buffer: AudioBuffer,
     uiBands: FrequencyBand[]
-  ) => {
-    const signal = buffer.getChannelData(0);
-    const sampleRate = buffer.sampleRate;
+  ): Promise<void> => {
+    setIsProcessing(true);
+    setProcessingError(null);
 
-    const stftOptions: STFTOptions = {
-      windowSize: 2048,
-      hopSize: 512,
-      fftSize: 2048,
-    };
+    try {
+      const signal = buffer.getChannelData(0);
+      const sampleRate = buffer.sampleRate;
 
-    const originalStftFrames = stftFrames(signal, stftOptions);
+      const stftOptions: STFTOptions = {
+        windowSize: 2048,
+        hopSize: 512,
+        fftSize: 2048,
+      };
 
-    const bandSpecs = toBandSpecs(uiBands);
-    const gainVector = buildGainVector(bandSpecs, stftOptions.fftSize, sampleRate);
+      // 1. Compute STFT of original signal
+      const originalStftFrames = stftFrames(signal, stftOptions);
 
-    const fftSize = stftOptions.fftSize;
-    const nyquistBin = Math.floor(fftSize / 2);
+      // 2. Build gain vector from bands
+      const bandSpecs = toBandSpecs(uiBands);
+      const gainVector = buildGainVector(bandSpecs, stftOptions.fftSize, sampleRate);
 
-    const modifiedFrames: Complex[][] = new Array(originalStftFrames.length);
+      // 3. Apply gains with Hermitian symmetry
+      const fftSize = stftOptions.fftSize;
+      const nyquistBin = Math.floor(fftSize / 2);
+      const modifiedFrames: Complex[][] = [];
 
-    for (let f = 0; f < originalStftFrames.length; f++) {
-      const frame = originalStftFrames[f];
-      const newFrame: Complex[] = frame.slice();
+      for (const frame of originalStftFrames) {
+        const newFrame: Complex[] = new Array(fftSize);
 
-      // 1) DC bin
-      const g0 = gainVector[0];
-      newFrame[0] = { re: frame[0].re * g0, im: frame[0].im * g0 };
+        // DC bin
+        const g0 = gainVector[0];
+        newFrame[0] = { re: frame[0].re * g0, im: frame[0].im * g0 };
 
-      // 2) 1..Nyquist-1 with Hermitian mirror
-      for (let i = 1; i < nyquistBin; i++) {
-        const g = gainVector[i];
-        newFrame[i] = { re: frame[i].re * g, im: frame[i].im * g };
-        const mirror = fftSize - i;
-        newFrame[mirror] = { re: frame[mirror].re * g, im: frame[mirror].im * g };
+        // Bins 1..Nyquist-1 with Hermitian mirror
+        for (let i = 1; i < nyquistBin; i++) {
+          const g = gainVector[i];
+          newFrame[i] = { re: frame[i].re * g, im: frame[i].im * g };
+          const mirror = fftSize - i;
+          newFrame[mirror] = { re: frame[mirror].re * g, im: frame[mirror].im * g };
+        }
+
+        // Nyquist bin (fftSize is even)
+        if (fftSize % 2 === 0) {
+          const gN = gainVector[nyquistBin];
+          newFrame[nyquistBin] = {
+            re: frame[nyquistBin].re * gN,
+            im: frame[nyquistBin].im * gN,
+          };
+        }
+
+        modifiedFrames.push(newFrame);
       }
 
-      // 3) Nyquist bin (exists when fftSize is even)
-      if (fftSize % 2 === 0) {
-        const gN = gainVector[nyquistBin];
-        newFrame[nyquistBin] = {
-          re: frame[nyquistBin].re * gN,
-          im: frame[nyquistBin].im * gN,
-        };
-      }
+      // 4. Inverse STFT
+      const outputSamples = istft(modifiedFrames, stftOptions);
 
-      modifiedFrames[f] = newFrame;
+      // 5. Create processed AudioBuffer
+      const processedAudioBuffer = new AudioContext().createBuffer(
+        1,
+        outputSamples.length,
+        sampleRate
+      );
+      processedAudioBuffer.getChannelData(0).set(outputSamples);
+      setProcessedBuffer(processedAudioBuffer);
+
+      // 6. Load into playback
+      await playbackRef.current.loadFromFloat32(outputSamples, sampleRate);
+
+      // 7. Generate output spectrogram
+      const outputSpectrogram = generateSpectrogram(
+        Array.from(outputSamples),
+        sampleRate
+      );
+      setOutputSpectrogramData(outputSpectrogram);
+
+    } catch (error) {
+      console.error('STFT EQ processing error:', error);
+      setProcessingError(error instanceof Error ? error.message : 'Unknown error');
+    } finally {
+      setIsProcessing(false);
     }
-
-    const outputSamples = istft(modifiedFrames, stftOptions);
-
-    // Load back into the player (keeps controls/EQ chain)
-    await playbackRef.current.loadFromFloat32(outputSamples, sampleRate);
   };
 
   // Load modes from JSON files
@@ -166,8 +203,9 @@ function App() {
     };
   }, [playbackState.isPlaying, playbackState.duration]);
 
-  const handleFileLoad = (buffer: AudioBuffer, name: string) => {
-    setAudioBuffer(buffer);
+  const handleFileLoad = async (buffer: AudioBuffer, name: string) => {
+    setOriginalBuffer(buffer);
+    setProcessedBuffer(null); // Clear previous processed buffer
     setFileName(name);
     setPlaybackState({
       isPlaying: false,
@@ -187,48 +225,42 @@ function App() {
     ];
     setBands(defaultBands);
 
-    // Set up playback
+    // Set up playback with original buffer initially
     playbackRef.current.setBuffer(buffer);
-    playbackRef.current.applyEqualizer(defaultBands);
 
-    // Generate spectrogram
+    // Generate input spectrogram
     const signal = buffer.getChannelData(0);
-    const spectrogram = generateSpectrogram(
+    const inputSpectrogram = generateSpectrogram(
       Array.from(signal),
       buffer.sampleRate
     );
-    setSpectrogramData(spectrogram);
+    setInputSpectrogramData(inputSpectrogram);
+    setOutputSpectrogramData(null); // Clear output until processing
+
+    // Initial processing with flat gain (0 dB on all bands)
+    await recomputeWithSTFTEQ(buffer, defaultBands);
   };
 
-
-  const handleBandChange = (bandId: string, gain: number) => {
+  const handleBandChange = async (bandId: string, gain: number) => {
     const updatedBands = bands.map(band =>
       band.id === bandId ? { ...band, gain } : band
     );
     setBands(updatedBands);
 
-    // Option A: live Biquad EQ (existing)
-    playbackRef.current.applyEqualizer(updatedBands);
-
-    // Option B: STFT-domain processing + reconstruction
-    if (audioBuffer) {
-      recomputeWithSTFTEQ(audioBuffer, updatedBands).catch(console.error);
+    if (originalBuffer) {
+      await recomputeWithSTFTEQ(originalBuffer, updatedBands);
     }
   };
 
-  const handleModeSelect = (modeName: string) => {
+  const handleModeSelect = async (modeName: string) => {
     const mode = modes.find(m => m.name === modeName);
     if (!mode) return;
 
     setCurrentMode(modeName);
     setBands(mode.bands);
 
-    // Live EQ
-    playbackRef.current.applyEqualizer(mode.bands);
-
-    // STFT-domain processing
-    if (audioBuffer) {
-      recomputeWithSTFTEQ(audioBuffer, mode.bands).catch(console.error);
+    if (originalBuffer) {
+      await recomputeWithSTFTEQ(originalBuffer, mode.bands);
     }
   };
 
@@ -264,7 +296,20 @@ function App() {
       
       {fileName && <p>Loaded: {fileName}</p>}
 
-      {audioBuffer && (
+      {isProcessing && (
+        <div className="processing-indicator">
+          <div className="spinner"></div>
+          <p>Processing audio...</p>
+        </div>
+      )}
+
+      {processingError && (
+        <div className="error-message">
+          <p>Error: {processingError}</p>
+        </div>
+      )}
+
+      {originalBuffer && (
         <>
           <Controls
             playbackState={playbackState}
@@ -282,14 +327,41 @@ function App() {
             />
           )}
 
-          <BandsList bands={bands} onBandChange={handleBandChange} />
-
-          <WaveformViewer
-            audioBuffer={audioBuffer}
-            currentTime={playbackState.currentTime}
+          <BandsList 
+            bands={bands} 
+            onBandChange={handleBandChange}
+            disabled={isProcessing}
           />
 
-          <SpectrogramPanel spectrogramData={spectrogramData} />
+          <div className="viewers-container">
+            <div className="viewer-section">
+              <h2>Input Signal</h2>
+              <WaveformViewer
+                audioBuffer={originalBuffer}
+                currentTime={playbackState.currentTime}
+              />
+            </div>
+
+            <div className="viewer-section">
+              <h2>Output Signal (EQ Applied)</h2>
+              <WaveformViewer
+                audioBuffer={processedBuffer}
+                currentTime={playbackState.currentTime}
+              />
+            </div>
+          </div>
+
+          <div className="spectrograms-container">
+            <div className="spectrogram-section">
+              <h2>Input Spectrogram</h2>
+              <SpectrogramPanel spectrogramData={inputSpectrogramData} />
+            </div>
+
+            <div className="spectrogram-section">
+              <h2>Output Spectrogram (EQ Applied)</h2>
+              <SpectrogramPanel spectrogramData={outputSpectrogramData} />
+            </div>
+          </div>
         </>
       )}
     </div>
