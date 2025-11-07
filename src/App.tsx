@@ -9,6 +9,7 @@ import WaveformViewer from './components/WaveformViewer';
 import SpectrogramPanel from './components/SpectrogramPanel';
 import Controls from './components/Controls';
 import ModeSelector from './components/ModeSelector';
+import GenericMode, { GenericBand, genericBandsToBandSpecs } from './components/GenericMode';
 import { AudioPlayback } from './lib/playback';
 import { stftFrames, istft } from './lib/stft';
 import { Complex } from './lib/fft';
@@ -16,14 +17,24 @@ import { generateSpectrogram, buildGainVector } from './lib/spectrogram';
 import { FrequencyBand, EqualizerMode, PlaybackState, SpectrogramData, BandSpec, STFTOptions } from './model/types';
 import './App.css';
 
+type AppMode = 'preset' | 'generic';
+
 function App() {
   // Audio buffers: original (immutable) and processed (EQ output)
   const [originalBuffer, setOriginalBuffer] = useState<AudioBuffer | null>(null);
   const [processedBuffer, setProcessedBuffer] = useState<AudioBuffer | null>(null);
   const [fileName, setFileName] = useState<string>('');
+  
+  // Mode switcher
+  const [appMode, setAppMode] = useState<AppMode>('preset');
+  
+  // Preset mode state
   const [bands, setBands] = useState<FrequencyBand[]>([]);
   const [modes, setModes] = useState<EqualizerMode[]>([]);
   const [currentMode, setCurrentMode] = useState<string | null>(null);
+  
+  // Generic mode state
+  const [genericBands, setGenericBands] = useState<GenericBand[]>([]);
   
   // Dual spectrograms: input and output
   const [inputSpectrogramData, setInputSpectrogramData] = useState<SpectrogramData | null>(null);
@@ -42,8 +53,8 @@ function App() {
   const playbackRef = useRef<AudioPlayback>(new AudioPlayback());
   const animationFrameRef = useRef<number>();
 
-  // Map UI bands -> BandSpec (single window per band, dB -> linear scale)
-  const toBandSpecs = (bs: FrequencyBand[]): BandSpec[] =>
+  // Map UI bands → BandSpec (preset mode: dB → linear)
+  const presetBandsToBandSpecs = (bs: FrequencyBand[]): BandSpec[] =>
     bs.map(b => ({
       scale: Math.pow(10, b.gain / 20),
       windows: [{ f_start_hz: b.range[0], f_end_hz: b.range[1] }],
@@ -52,7 +63,7 @@ function App() {
   // STFT-domain EQ processing pipeline
   const recomputeWithSTFTEQ = async (
     buffer: AudioBuffer,
-    uiBands: FrequencyBand[]
+    bandSpecs: BandSpec[]
   ): Promise<void> => {
     setIsProcessing(true);
     setProcessingError(null);
@@ -71,7 +82,6 @@ function App() {
       const originalStftFrames = stftFrames(signal, stftOptions);
 
       // 2. Build gain vector from bands
-      const bandSpecs = toBandSpecs(uiBands);
       const gainVector = buildGainVector(bandSpecs, stftOptions.fftSize, sampleRate);
 
       // 3. Apply gains with Hermitian symmetry
@@ -205,7 +215,7 @@ function App() {
 
   const handleFileLoad = async (buffer: AudioBuffer, name: string) => {
     setOriginalBuffer(buffer);
-    setProcessedBuffer(null); // Clear previous processed buffer
+    setProcessedBuffer(null);
     setFileName(name);
     setPlaybackState({
       isPlaying: false,
@@ -213,7 +223,7 @@ function App() {
       duration: buffer.duration,
     });
 
-    // Initialize default bands
+    // Initialize default bands for preset mode
     const defaultBands: FrequencyBand[] = [
       { id: '1', label: 'Sub Bass', frequency: 60, gain: 0, range: [20, 100] },
       { id: '2', label: 'Bass', frequency: 150, gain: 0, range: [100, 250] },
@@ -225,6 +235,12 @@ function App() {
     ];
     setBands(defaultBands);
 
+    // Initialize default generic bands
+    const defaultGenericBands: GenericBand[] = [
+      { id: '1', startHz: 20, endHz: 200, scale: 1.0 },
+    ];
+    setGenericBands(defaultGenericBands);
+
     // Set up playback with original buffer initially
     playbackRef.current.setBuffer(buffer);
 
@@ -235,10 +251,14 @@ function App() {
       buffer.sampleRate
     );
     setInputSpectrogramData(inputSpectrogram);
-    setOutputSpectrogramData(null); // Clear output until processing
+    setOutputSpectrogramData(null);
 
-    // Initial processing with flat gain (0 dB on all bands)
-    await recomputeWithSTFTEQ(buffer, defaultBands);
+    // Initial processing based on current mode
+    if (appMode === 'preset') {
+      await recomputeWithSTFTEQ(buffer, presetBandsToBandSpecs(defaultBands));
+    } else {
+      await recomputeWithSTFTEQ(buffer, genericBandsToBandSpecs(defaultGenericBands));
+    }
   };
 
   const handleBandChange = async (bandId: string, gain: number) => {
@@ -248,7 +268,7 @@ function App() {
     setBands(updatedBands);
 
     if (originalBuffer) {
-      await recomputeWithSTFTEQ(originalBuffer, updatedBands);
+      await recomputeWithSTFTEQ(originalBuffer, presetBandsToBandSpecs(updatedBands));
     }
   };
 
@@ -260,7 +280,28 @@ function App() {
     setBands(mode.bands);
 
     if (originalBuffer) {
-      await recomputeWithSTFTEQ(originalBuffer, mode.bands);
+      await recomputeWithSTFTEQ(originalBuffer, presetBandsToBandSpecs(mode.bands));
+    }
+  };
+
+  const handleGenericBandsChange = async (newBands: GenericBand[]) => {
+    setGenericBands(newBands);
+
+    if (originalBuffer) {
+      await recomputeWithSTFTEQ(originalBuffer, genericBandsToBandSpecs(newBands));
+    }
+  };
+
+  const handleModeSwitch = (mode: AppMode) => {
+    setAppMode(mode);
+    
+    // Reprocess with the appropriate mode
+    if (originalBuffer) {
+      if (mode === 'preset') {
+        recomputeWithSTFTEQ(originalBuffer, presetBandsToBandSpecs(bands));
+      } else {
+        recomputeWithSTFTEQ(originalBuffer, genericBandsToBandSpecs(genericBands));
+      }
     }
   };
 
@@ -296,6 +337,26 @@ function App() {
       
       {fileName && <p>Loaded: {fileName}</p>}
 
+      {/* Mode switcher */}
+      {originalBuffer && (
+        <div className="mode-switcher">
+          <button
+            className={appMode === 'preset' ? 'active' : ''}
+            onClick={() => handleModeSwitch('preset')}
+            disabled={isProcessing}
+          >
+            Preset Modes
+          </button>
+          <button
+            className={appMode === 'generic' ? 'active' : ''}
+            onClick={() => handleModeSwitch('generic')}
+            disabled={isProcessing}
+          >
+            Generic Mode
+          </button>
+        </div>
+      )}
+
       {isProcessing && (
         <div className="processing-indicator">
           <div className="spinner"></div>
@@ -319,19 +380,29 @@ function App() {
             onSeek={handleSeek}
           />
 
-          {modes.length > 0 && (
-            <ModeSelector
-              modes={modes}
-              currentMode={currentMode}
-              onModeSelect={handleModeSelect}
+          {appMode === 'preset' ? (
+            <>
+              {modes.length > 0 && (
+                <ModeSelector
+                  modes={modes}
+                  currentMode={currentMode}
+                  onModeSelect={handleModeSelect}
+                />
+              )}
+
+              <BandsList 
+                bands={bands} 
+                onBandChange={handleBandChange}
+                disabled={isProcessing}
+              />
+            </>
+          ) : (
+            <GenericMode
+              onBandsChange={handleGenericBandsChange}
+              sampleRate={originalBuffer.sampleRate}
+              disabled={isProcessing}
             />
           )}
-
-          <BandsList 
-            bands={bands} 
-            onBandChange={handleBandChange}
-            disabled={isProcessing}
-          />
 
           <div className="viewers-container">
             <div className="viewer-section">
