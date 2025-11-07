@@ -17,6 +17,15 @@ export class AudioPlayback {
   private pauseTime: number = 0;
   private isPlaying: boolean = false;
 
+    // Load raw Float32 samples into the player (keeps EQ/controls)
+  async loadFromFloat32(samples: Float32Array, sampleRate: number): Promise<void> {
+    this.initialize();
+    if (!this.audioContext) return;
+    const buffer = this.audioContext.createBuffer(1, samples.length, sampleRate);
+    buffer.getChannelData(0).set(samples);
+    this.setBuffer(buffer);
+  }
+
   /**
    * Initialize audio context
    */
@@ -177,4 +186,21 @@ export class AudioPlayback {
       this.audioContext = null;
     }
   }
+}
+
+
+// Standalone quick-play helper (no EQ/seek/pause)
+export async function playFloat32(
+  samples: Float32Array,
+  sampleRate: number
+) {
+  const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+  const buffer = ctx.createBuffer(1, samples.length, sampleRate);
+  buffer.getChannelData(0).set(samples);
+  const src = ctx.createBufferSource();
+  src.buffer = buffer;
+  src.connect(ctx.destination);
+  await ctx.resume();
+  src.start();
+  return { ctx, src };
 }
