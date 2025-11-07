@@ -127,15 +127,16 @@ export function istft(
   for (const frame of stftFramesIn) {
     const ifftResult = ifft(frame);
 
+    // Overlap-Add without a second window; normalize by sum of analysis window
     for (let i = 0; i < windowSize; i++) {
-      outputSignal[offset + i] += ifftResult[i].re * hannWindow[i];
-      windowSum[offset + i] += hannWindow[i] * hannWindow[i];
+      outputSignal[offset + i] += ifftResult[i].re;
+      windowSum[offset + i] += hannWindow[i];
     }
     offset += hopSize;
   }
 
   for (let i = 0; i < outputLength; i++) {
-    if (windowSum[i] > 1e-6) {
+    if (windowSum[i] > 1e-12) {
       outputSignal[i] /= windowSum[i];
     }
   }
