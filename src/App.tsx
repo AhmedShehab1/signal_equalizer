@@ -10,8 +10,10 @@ import SpectrogramPanel from './components/SpectrogramPanel';
 import Controls from './components/Controls';
 import ModeSelector from './components/ModeSelector';
 import { AudioPlayback } from './lib/playback';
-import { generateSpectrogram } from './lib/spectrogram';
-import { FrequencyBand, EqualizerMode, PlaybackState, SpectrogramData } from './model/types';
+import { stftFrames, istft } from './lib/stft';
+import { Complex } from './lib/fft';
+import { generateSpectrogram, buildGainVector } from './lib/spectrogram';
+import { FrequencyBand, EqualizerMode, PlaybackState, SpectrogramData, BandSpec, STFTOptions } from './model/types';
 import './App.css';
 
 function App() {
@@ -29,6 +31,73 @@ function App() {
 
   const playbackRef = useRef<AudioPlayback>(new AudioPlayback());
   const animationFrameRef = useRef<number>();
+
+
+    // Map UI bands -> BandSpec (single window per band, dB -> linear scale)
+  const toBandSpecs = (bs: FrequencyBand[]): BandSpec[] =>
+    bs.map(b => ({
+      // gain is assumed dB; change if your UI uses linear scale
+      scale: Math.pow(10, b.gain / 20),
+      windows: [{ f_start_hz: b.range[0], f_end_hz: b.range[1] }],
+    }));
+
+    // Recompute output via STFT-domain EQ and load into the player
+  const recomputeWithSTFTEQ = async (
+    buffer: AudioBuffer,
+    uiBands: FrequencyBand[]
+  ) => {
+    const signal = buffer.getChannelData(0);
+    const sampleRate = buffer.sampleRate;
+
+    const stftOptions: STFTOptions = {
+      windowSize: 2048,
+      hopSize: 512,
+      fftSize: 2048,
+    };
+
+    const originalStftFrames = stftFrames(signal, stftOptions);
+
+    const bandSpecs = toBandSpecs(uiBands);
+    const gainVector = buildGainVector(bandSpecs, stftOptions.fftSize, sampleRate);
+
+    const fftSize = stftOptions.fftSize;
+    const nyquistBin = Math.floor(fftSize / 2);
+
+    const modifiedFrames: Complex[][] = new Array(originalStftFrames.length);
+
+    for (let f = 0; f < originalStftFrames.length; f++) {
+      const frame = originalStftFrames[f];
+      const newFrame: Complex[] = frame.slice();
+
+      // 1) DC bin
+      const g0 = gainVector[0];
+      newFrame[0] = { re: frame[0].re * g0, im: frame[0].im * g0 };
+
+      // 2) 1..Nyquist-1 with Hermitian mirror
+      for (let i = 1; i < nyquistBin; i++) {
+        const g = gainVector[i];
+        newFrame[i] = { re: frame[i].re * g, im: frame[i].im * g };
+        const mirror = fftSize - i;
+        newFrame[mirror] = { re: frame[mirror].re * g, im: frame[mirror].im * g };
+      }
+
+      // 3) Nyquist bin (exists when fftSize is even)
+      if (fftSize % 2 === 0) {
+        const gN = gainVector[nyquistBin];
+        newFrame[nyquistBin] = {
+          re: frame[nyquistBin].re * gN,
+          im: frame[nyquistBin].im * gN,
+        };
+      }
+
+      modifiedFrames[f] = newFrame;
+    }
+
+    const outputSamples = istft(modifiedFrames, stftOptions);
+
+    // Load back into the player (keeps controls/EQ chain)
+    await playbackRef.current.loadFromFloat32(outputSamples, sampleRate);
+  };
 
   // Load modes from JSON files
   useEffect(() => {
@@ -131,12 +200,20 @@ function App() {
     setSpectrogramData(spectrogram);
   };
 
+
   const handleBandChange = (bandId: string, gain: number) => {
     const updatedBands = bands.map(band =>
       band.id === bandId ? { ...band, gain } : band
     );
     setBands(updatedBands);
+
+    // Option A: live Biquad EQ (existing)
     playbackRef.current.applyEqualizer(updatedBands);
+
+    // Option B: STFT-domain processing + reconstruction
+    if (audioBuffer) {
+      recomputeWithSTFTEQ(audioBuffer, updatedBands).catch(console.error);
+    }
   };
 
   const handleModeSelect = (modeName: string) => {
@@ -145,7 +222,14 @@ function App() {
 
     setCurrentMode(modeName);
     setBands(mode.bands);
+
+    // Live EQ
     playbackRef.current.applyEqualizer(mode.bands);
+
+    // STFT-domain processing
+    if (audioBuffer) {
+      recomputeWithSTFTEQ(audioBuffer, mode.bands).catch(console.error);
+    }
   };
 
   const handlePlay = () => {
