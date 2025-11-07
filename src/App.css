@@ -128,3 +128,66 @@ canvas {
   display: block;
   max-width: 100%;
 }
+
+/* ...existing code... */
+
+.processing-indicator {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: rgba(100, 108, 255, 0.1);
+  border: 1px solid rgba(100, 108, 255, 0.3);
+  border-radius: 8px;
+  margin: 16px 0;
+}
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid rgba(100, 108, 255, 0.3);
+  border-top-color: #646cff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.error-message {
+  padding: 16px;
+  background: rgba(255, 107, 107, 0.1);
+  border: 1px solid rgba(255, 107, 107, 0.3);
+  border-radius: 8px;
+  margin: 16px 0;
+  color: #ff6b6b;
+}
+
+.viewers-container,
+.spectrograms-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin: 24px 0;
+}
+
+.viewer-section,
+.spectrogram-section {
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.viewer-section h2,
+.spectrogram-section h2 {
+  margin-top: 0;
+  font-size: 1.2rem;
+  color: #646cff;
+}
+
+input[type="range"]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
