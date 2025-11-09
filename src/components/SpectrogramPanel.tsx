@@ -6,21 +6,17 @@ import { SpectrogramData } from '../model/types';
 
 interface SpectrogramPanelProps {
   spectrogramData: SpectrogramData | null;
-  sampleRate?: number;      // optional if you have it
-  fftSize?: number;         // optional (for bin->freq). Falls back to frequencyBins.
 }
 
 export default function SpectrogramPanel({
   spectrogramData,
-  sampleRate,
-  fftSize,
 }: SpectrogramPanelProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [freqScale, setFreqScale] = useState<'linear' | 'audiogram'>('linear');
 
   useEffect(() => {
     if (!spectrogramData || !canvasRef.current) return;
-    const { data, frequencyBins, maxMagnitude, timeSteps } = spectrogramData;
+    const { data, frequencyBins, maxMagnitude } = spectrogramData;
     if (!data.length || !frequencyBins.length) return;
 
     const canvas = canvasRef.current;
