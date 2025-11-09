@@ -119,12 +119,17 @@ function App() {
       // 4. Inverse STFT
       const outputSamples = istft(modifiedFrames, stftOptions);
 
-      // 5. Create processed AudioBuffer
-      const processedAudioBuffer = new AudioContext().createBuffer(
+      // 5. Create processed AudioBuffer using shared AudioContext
+      const processedAudioBuffer = playbackRef.current.createBuffer(
         1,
         outputSamples.length,
         sampleRate
       );
+      
+      if (!processedAudioBuffer) {
+        throw new Error('Failed to create AudioBuffer');
+      }
+      
       processedAudioBuffer.getChannelData(0).set(outputSamples);
       setProcessedBuffer(processedAudioBuffer);
 

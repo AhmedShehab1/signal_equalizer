@@ -36,6 +36,23 @@ export class AudioPlayback {
   }
 
   /**
+   * Get the shared AudioContext instance
+   */
+  getAudioContext(): AudioContext | null {
+    return this.audioContext;
+  }
+
+  /**
+   * Create an AudioBuffer using the shared context
+   */
+  createBuffer(numChannels: number, length: number, sampleRate: number): AudioBuffer | null {
+    if (!this.audioContext) {
+      this.initialize();
+    }
+    return this.audioContext ? this.audioContext.createBuffer(numChannels, length, sampleRate) : null;
+  }
+
+  /**
    * Load audio buffer
    */
   setBuffer(buffer: AudioBuffer): void {
