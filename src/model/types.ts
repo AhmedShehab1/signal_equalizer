@@ -27,6 +27,30 @@ export interface EqualizerMode {
   bands: FrequencyBand[];
 }
 
+// Customized mode slider specification (multi-window)
+export interface SliderSpec {
+  id: string;
+  label: string;
+  defaultScale: number; // Linear gain [0.0 - 2.0]
+  windows: BandWindow[];
+}
+
+// Customized mode configuration
+export interface CustomizedMode {
+  name: string;
+  description: string;
+  sliders: SliderSpec[];
+}
+
+// Discriminated union for mode types
+export type EqualizerModeType = 'preset' | 'generic' | 'custom';
+
+// Current customized mode state (slider values)
+export interface CustomModeState {
+  modeId: string;
+  sliders: Map<string, number>; // slider id -> current scale
+}
+
 // Spectrogram data
 export interface SpectrogramData {
   data: number[][];
