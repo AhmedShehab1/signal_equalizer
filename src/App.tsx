@@ -52,6 +52,7 @@ function App() {
 
   const playbackRef = useRef<AudioPlayback>(new AudioPlayback());
   const animationFrameRef = useRef<number>();
+  const recomputeTokenRef = useRef<number>(0);
 
   // Map UI bands → BandSpec (preset mode: dB → linear)
   const presetBandsToBandSpecs = (bs: FrequencyBand[]): BandSpec[] =>
@@ -60,11 +61,14 @@ function App() {
       windows: [{ f_start_hz: b.range[0], f_end_hz: b.range[1] }],
     }));
 
-  // STFT-domain EQ processing pipeline
+  // STFT-domain EQ processing pipeline with race protection
   const recomputeWithSTFTEQ = async (
     buffer: AudioBuffer,
     bandSpecs: BandSpec[]
   ): Promise<void> => {
+    // Capture current token and increment for this request
+    const myToken = ++recomputeTokenRef.current;
+    
     setIsProcessing(true);
     setProcessingError(null);
 
@@ -80,6 +84,12 @@ function App() {
 
       // 1. Compute STFT of original signal
       const originalStftFrames = stftFrames(signal, stftOptions);
+
+      // Check if still current after async operation
+      if (myToken !== recomputeTokenRef.current) {
+        console.log('STFT computation cancelled: newer request exists');
+        return;
+      }
 
       // 2. Build gain vector from bands
       const gainVector = buildGainVector(bandSpecs, stftOptions.fftSize, sampleRate);
@@ -119,6 +129,12 @@ function App() {
       // 4. Inverse STFT
       const outputSamples = istft(modifiedFrames, stftOptions);
 
+      // Check if still current after heavy ISTFT operation
+      if (myToken !== recomputeTokenRef.current) {
+        console.log('ISTFT computation cancelled: newer request exists');
+        return;
+      }
+
       // 5. Create processed AudioBuffer using shared AudioContext
       const processedAudioBuffer = playbackRef.current.createBuffer(
         1,
@@ -131,24 +147,53 @@ function App() {
       }
       
       processedAudioBuffer.getChannelData(0).set(outputSamples);
-      setProcessedBuffer(processedAudioBuffer);
 
       // 6. Load into playback
       await playbackRef.current.loadFromFloat32(outputSamples, sampleRate);
+
+      // Check if still current after playback load
+      if (myToken !== recomputeTokenRef.current) {
+        console.log('Playback load cancelled: newer request exists');
+        return;
+      }
 
       // 7. Generate output spectrogram
       const outputSpectrogram = generateSpectrogram(
         Array.from(outputSamples),
         sampleRate
       );
+
+      // Final check before applying state changes
+      if (myToken !== recomputeTokenRef.current) {
+        console.log('Spectrogram generation cancelled: newer request exists');
+        return;
+      }
+
+      // Apply state changes only if this is still the current request
+      setProcessedBuffer(processedAudioBuffer);
       setOutputSpectrogramData(outputSpectrogram);
 
     } catch (error) {
-      console.error('STFT EQ processing error:', error);
-      setProcessingError(error instanceof Error ? error.message : 'Unknown error');
+      // Only set error if this is still the current request
+      if (myToken === recomputeTokenRef.current) {
+        console.error('STFT EQ processing error:', error);
+        setProcessingError(error instanceof Error ? error.message : 'Unknown error');
+      }
     } finally {
-      setIsProcessing(false);
+      // Only clear processing flag if this is still the current request
+      if (myToken === recomputeTokenRef.current) {
+        setIsProcessing(false);
+      }
     }
+  };
+
+  // Helper to run recompute with current buffer and bands
+  const runRecompute = async (bandSpecs: BandSpec[]): Promise<void> => {
+    if (!originalBuffer) {
+      console.warn('Cannot recompute: no original buffer loaded');
+      return;
+    }
+    await recomputeWithSTFTEQ(originalBuffer, bandSpecs);
   };
 
   // Load modes from JSON files
@@ -260,9 +305,9 @@ function App() {
 
     // Initial processing based on current mode
     if (appMode === 'preset') {
-      await recomputeWithSTFTEQ(buffer, presetBandsToBandSpecs(defaultBands));
+      await runRecompute(presetBandsToBandSpecs(defaultBands));
     } else {
-      await recomputeWithSTFTEQ(buffer, genericBandsToBandSpecs(defaultGenericBands));
+      await runRecompute(genericBandsToBandSpecs(defaultGenericBands));
     }
   };
 
@@ -271,10 +316,7 @@ function App() {
       band.id === bandId ? { ...band, gain } : band
     );
     setBands(updatedBands);
-
-    if (originalBuffer) {
-      await recomputeWithSTFTEQ(originalBuffer, presetBandsToBandSpecs(updatedBands));
-    }
+    await runRecompute(presetBandsToBandSpecs(updatedBands));
   };
 
   const handleModeSelect = async (modeName: string) => {
@@ -283,30 +325,24 @@ function App() {
 
     setCurrentMode(modeName);
     setBands(mode.bands);
-
-    if (originalBuffer) {
-      await recomputeWithSTFTEQ(originalBuffer, presetBandsToBandSpecs(mode.bands));
-    }
+    await runRecompute(presetBandsToBandSpecs(mode.bands));
   };
 
   const handleGenericBandsChange = async (newBands: GenericBand[]) => {
     setGenericBands(newBands);
-
-    if (originalBuffer) {
-      await recomputeWithSTFTEQ(originalBuffer, genericBandsToBandSpecs(newBands));
-    }
+    await runRecompute(genericBandsToBandSpecs(newBands));
   };
 
-  const handleModeSwitch = (mode: AppMode) => {
+  const handleModeSwitch = async (mode: AppMode) => {
     setAppMode(mode);
     
+    if (!originalBuffer) return;
+    
     // Reprocess with the appropriate mode
-    if (originalBuffer) {
-      if (mode === 'preset') {
-        recomputeWithSTFTEQ(originalBuffer, presetBandsToBandSpecs(bands));
-      } else {
-        recomputeWithSTFTEQ(originalBuffer, genericBandsToBandSpecs(genericBands));
-      }
+    if (mode === 'preset') {
+      await runRecompute(presetBandsToBandSpecs(bands));
+    } else {
+      await runRecompute(genericBandsToBandSpecs(genericBands));
     }
   };
 
