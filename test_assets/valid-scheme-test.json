@@ -1,0 +1,27 @@
+{
+  "name": "Valid Test Scheme",
+  "description": "All bands within valid constraints",
+  "sampleRate": 44100,
+  "bands": [
+    {
+      "startHz": 20,
+      "endHz": 200,
+      "scale": 0.8
+    },
+    {
+      "startHz": 200,
+      "endHz": 1000,
+      "scale": 1.2
+    },
+    {
+      "startHz": 1000,
+      "endHz": 5000,
+      "scale": 1.5
+    },
+    {
+      "startHz": 5000,
+      "endHz": 22050,
+      "scale": 0.5
+    }
+  ]
+}

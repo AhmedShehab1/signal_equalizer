@@ -1,0 +1,49 @@
+{
+  "name": "Test Invalid Scheme",
+  "description": "Contains various validation edge cases",
+  "sampleRate": 44100,
+  "bands": [
+    {
+      "startHz": -100,
+      "endHz": 500,
+      "scale": 1.0,
+      "comment": "Negative start (should clamp to 0)"
+    },
+    {
+      "startHz": 1000,
+      "endHz": 50000,
+      "scale": 0.5,
+      "comment": "End above Nyquist (should clamp to 22050)"
+    },
+    {
+      "startHz": 2000,
+      "endHz": 1000,
+      "scale": 1.5,
+      "comment": "Reversed range (should swap)"
+    },
+    {
+      "startHz": 5000,
+      "endHz": 5000,
+      "scale": 1.0,
+      "comment": "Zero-width range (should reject)"
+    },
+    {
+      "startHz": 100,
+      "endHz": 200,
+      "scale": -0.5,
+      "comment": "Negative scale (should clamp to 0)"
+    },
+    {
+      "startHz": 300,
+      "endHz": 400,
+      "scale": 3.5,
+      "comment": "Scale above 2 (should clamp to 2)"
+    },
+    {
+      "startHz": "invalid",
+      "endHz": 1000,
+      "scale": 1.0,
+      "comment": "NaN start (should reject)"
+    }
+  ]
+}
