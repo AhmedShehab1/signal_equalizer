@@ -192,6 +192,21 @@ input[type="range"]:disabled {
   cursor: not-allowed;
 }
 
+/* Accessibility: fieldset disabled styling */
+fieldset:disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* Input hints for frequency ranges */
+.input-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.75rem;
+  color: #888;
+  font-style: italic;
+}
+
 /* ...existing code... */
 
 .mode-switcher {

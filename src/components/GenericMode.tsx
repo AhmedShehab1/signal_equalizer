@@ -44,8 +44,19 @@ export default function GenericMode({ onBandsChange, sampleRate, disabled = fals
   };
 
   const updateBand = (id: string, field: keyof GenericBand, value: number) => {
+    // Validate and clamp values
+    let clampedValue = value;
+    
+    if (field === 'startHz' || field === 'endHz') {
+      // Clamp frequency to [0, nyquist]
+      clampedValue = Math.max(0, Math.min(nyquist, value));
+    } else if (field === 'scale') {
+      // Clamp scale to [0, 2]
+      clampedValue = Math.max(0, Math.min(2, value));
+    }
+    
     const updatedBands = bands.map(b =>
-      b.id === id ? { ...b, [field]: value } : b
+      b.id === id ? { ...b, [field]: clampedValue } : b
     );
     setBands(updatedBands);
     onBandsChange(updatedBands);
@@ -127,13 +138,19 @@ export default function GenericMode({ onBandsChange, sampleRate, disabled = fals
 
       <div className="generic-bands-list">
         {bands.map((band, index) => (
-          <div key={band.id} className="generic-band">
+          <fieldset 
+            key={band.id} 
+            className="generic-band"
+            disabled={disabled}
+            style={{ border: '1px solid #333', borderRadius: '8px' }}
+          >
             <div className="band-header">
               <h4>Band {index + 1}</h4>
               <button
                 onClick={() => deleteBand(band.id)}
-                disabled={disabled || bands.length === 1}
+                disabled={bands.length === 1}
                 className="delete-button"
+                aria-label={`Delete band ${index + 1}`}
               >
                 ✕
               </button>
@@ -141,49 +158,66 @@ export default function GenericMode({ onBandsChange, sampleRate, disabled = fals
 
             <div className="band-controls">
               <div className="control-group">
-                <label>
+                <label htmlFor={`start-${band.id}`}>
                   Start Frequency (Hz)
                   <input
+                    id={`start-${band.id}`}
                     type="number"
                     min="0"
                     max={nyquist}
                     step="1"
                     value={band.startHz}
-                    onChange={(e) => updateBand(band.id, 'startHz', parseFloat(e.target.value))}
-                    disabled={disabled}
+                    onChange={(e) => updateBand(band.id, 'startHz', parseFloat(e.target.value) || 0)}
+                    aria-label={`Start frequency for band ${index + 1}`}
+                    aria-describedby={`start-hint-${band.id}`}
                   />
+                  <small id={`start-hint-${band.id}`} className="input-hint">
+                    Range: 0 - {Math.round(nyquist)} Hz
+                  </small>
                 </label>
               </div>
 
               <div className="control-group">
-                <label>
+                <label htmlFor={`end-${band.id}`}>
                   End Frequency (Hz)
                   <input
+                    id={`end-${band.id}`}
                     type="number"
                     min="0"
                     max={nyquist}
                     step="1"
                     value={band.endHz}
-                    onChange={(e) => updateBand(band.id, 'endHz', parseFloat(e.target.value))}
-                    disabled={disabled}
+                    onChange={(e) => updateBand(band.id, 'endHz', parseFloat(e.target.value) || 0)}
+                    aria-label={`End frequency for band ${index + 1}`}
+                    aria-describedby={`end-hint-${band.id}`}
                   />
+                  <small id={`end-hint-${band.id}`} className="input-hint">
+                    Range: 0 - {Math.round(nyquist)} Hz
+                  </small>
                 </label>
               </div>
 
               <div className="control-group scale-control">
-                <label>
+                <label htmlFor={`scale-${band.id}`}>
                   Gain Scale (Linear)
                   <div className="slider-container">
                     <input
+                      id={`scale-${band.id}`}
                       type="range"
                       min="0"
                       max="2"
                       step="0.01"
                       value={band.scale}
                       onChange={(e) => updateBand(band.id, 'scale', parseFloat(e.target.value))}
-                      disabled={disabled}
+                      aria-label={`Gain scale for band ${index + 1}`}
+                      aria-valuemin={0}
+                      aria-valuemax={2}
+                      aria-valuenow={band.scale}
+                      aria-valuetext={`${band.scale.toFixed(2)} times`}
                     />
-                    <span className="scale-value">{band.scale.toFixed(2)}×</span>
+                    <span className="scale-value" aria-live="polite">
+                      {band.scale.toFixed(2)}×
+                    </span>
                   </div>
                   <div className="scale-labels">
                     <span>0.0× (mute)</span>
@@ -193,7 +227,7 @@ export default function GenericMode({ onBandsChange, sampleRate, disabled = fals
                 </label>
               </div>
             </div>
-          </div>
+          </fieldset>
         ))}
       </div>
     </div>

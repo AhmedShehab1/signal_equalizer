@@ -14,23 +14,29 @@ export default function BandsList({ bands, onBandChange, disabled = false }: Ban
   return (
     <div className="bands-list">
       <h2>Equalizer Bands</h2>
-      {bands.map(band => (
-        <div key={band.id} className="band">
-          <label>
-            {band.label} ({band.frequency} Hz)
-            <input
-              type="range"
-              min="-12"
-              max="12"
-              step="0.1"
-              value={band.gain}
-              onChange={(e) => onBandChange(band.id, parseFloat(e.target.value))}
-              disabled={disabled}
-            />
-            <span>{band.gain.toFixed(1)} dB</span>
-          </label>
-        </div>
-      ))}
+      <fieldset disabled={disabled} style={{ border: 'none', padding: 0, margin: 0 }}>
+        {bands.map(band => (
+          <div key={band.id} className="band">
+            <label>
+              {band.label} ({band.frequency} Hz)
+              <input
+                type="range"
+                min="-12"
+                max="12"
+                step="0.1"
+                value={band.gain}
+                onChange={(e) => onBandChange(band.id, parseFloat(e.target.value))}
+                aria-label={`${band.label} gain control`}
+                aria-valuemin={-12}
+                aria-valuemax={12}
+                aria-valuenow={band.gain}
+                aria-valuetext={`${band.gain.toFixed(1)} dB`}
+              />
+              <span aria-live="polite">{band.gain.toFixed(1)} dB</span>
+            </label>
+          </div>
+        ))}
+      </fieldset>
     </div>
   );
 }
