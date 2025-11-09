@@ -92,18 +92,90 @@ export default function GenericMode({ onBandsChange, sampleRate, disabled = fals
       try {
         const scheme = JSON.parse(e.target?.result as string);
         if (!scheme.bands || !Array.isArray(scheme.bands)) {
-          throw new Error('Invalid scheme format');
+          throw new Error('Invalid scheme format: missing or invalid "bands" array');
         }
 
-        const importedBands: GenericBand[] = scheme.bands.map((b: any, idx: number) => ({
-          id: `imported-${Date.now()}-${idx}`,
-          startHz: Number(b.startHz) || 20,
-          endHz: Number(b.endHz) || 200,
-          scale: Number(b.scale) || 1.0,
-        }));
+        const validatedBands: GenericBand[] = [];
+        const errors: string[] = [];
 
-        setBands(importedBands);
-        onBandsChange(importedBands);
+        scheme.bands.forEach((b: any, idx: number) => {
+          const bandNum = idx + 1;
+          
+          // Parse and validate values
+          let startHz = Number(b.startHz);
+          let endHz = Number(b.endHz);
+          let scale = Number(b.scale);
+
+          // Check for NaN values
+          if (isNaN(startHz) || isNaN(endHz) || isNaN(scale)) {
+            errors.push(`Band ${bandNum}: Invalid numeric values (startHz: ${b.startHz}, endHz: ${b.endHz}, scale: ${b.scale})`);
+            return;
+          }
+
+          // Clamp frequencies to [0, nyquist]
+          const originalStart = startHz;
+          const originalEnd = endHz;
+          startHz = Math.max(0, Math.min(nyquist, startHz));
+          endHz = Math.max(0, Math.min(nyquist, endHz));
+
+          if (originalStart !== startHz || originalEnd !== endHz) {
+            console.warn(`Band ${bandNum}: Frequencies clamped to valid range [0, ${nyquist}]`);
+          }
+
+          // Clamp scale to [0, 2]
+          const originalScale = scale;
+          scale = Math.max(0, Math.min(2, scale));
+          
+          if (originalScale !== scale) {
+            console.warn(`Band ${bandNum}: Scale clamped to valid range [0, 2]`);
+          }
+
+          // Validate startHz < endHz
+          if (startHz >= endHz) {
+            // Auto-fix: swap if both are valid, otherwise use sensible defaults
+            if (startHz > 0 && endHz > 0) {
+              [startHz, endHz] = [endHz, startHz];
+              console.warn(`Band ${bandNum}: Start and end frequencies swapped (start was >= end)`);
+            } else {
+              errors.push(`Band ${bandNum}: Invalid range (start: ${startHz} Hz, end: ${endHz} Hz). Start must be less than end.`);
+              return;
+            }
+          }
+
+          // Additional validation: ensure meaningful range
+          if (endHz - startHz < 1) {
+            errors.push(`Band ${bandNum}: Range too narrow (${startHz}-${endHz} Hz). Minimum 1 Hz width required.`);
+            return;
+          }
+
+          validatedBands.push({
+            id: `imported-${Date.now()}-${idx}`,
+            startHz,
+            endHz,
+            scale,
+          });
+        });
+
+        // Check if we have any valid bands
+        if (validatedBands.length === 0) {
+          throw new Error(
+            'No valid bands found in scheme.\n\n' +
+            'Errors:\n' + errors.join('\n')
+          );
+        }
+
+        // Show warnings if some bands were rejected
+        if (errors.length > 0) {
+          const message = 
+            `Imported ${validatedBands.length} valid band(s). ` +
+            `${errors.length} band(s) rejected:\n\n` +
+            errors.join('\n');
+          alert(message);
+        }
+
+        setBands(validatedBands);
+        onBandsChange(validatedBands);
+        
       } catch (error) {
         alert('Failed to import scheme: ' + (error instanceof Error ? error.message : 'Invalid JSON'));
       }
