@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { stftFrames, istft, getHannWindow, STFTOptions } from '../stft';
+import { stftFrames, istft, STFTOptions } from '../stft';
 import { Complex } from '../fft';
 
 function rms(a: Float32Array, b: Float32Array): number {
