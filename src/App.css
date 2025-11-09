@@ -448,3 +448,158 @@ input[type="range"]:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* Customized Mode Panel Styles */
+.customized-mode-panel {
+  margin: 24px 0;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+}
+
+.mode-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+  gap: 16px;
+}
+
+.mode-info h2 {
+  margin: 0 0 8px 0;
+  color: #646cff;
+}
+
+.mode-description {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #aaa;
+}
+
+.mode-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.mode-selector-dropdown {
+  padding: 8px 12px;
+  background: rgba(100, 108, 255, 0.1);
+  border: 1px solid rgba(100, 108, 255, 0.3);
+  border-radius: 4px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.mode-selector-dropdown:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.reset-button {
+  padding: 8px 16px;
+  background: rgba(255, 165, 0, 0.2);
+  border: 1px solid rgba(255, 165, 0, 0.5);
+  border-radius: 4px;
+  color: #ffa500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.reset-button:hover:not(:disabled) {
+  background: rgba(255, 165, 0, 0.4);
+}
+
+.reset-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sliders-container {
+  border: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.multi-window-slider {
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid #333;
+  border-radius: 8px;
+}
+
+.slider-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.slider-header label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  color: #fff;
+}
+
+.windows-badge {
+  padding: 2px 8px;
+  background: rgba(100, 108, 255, 0.3);
+  border: 1px solid rgba(100, 108, 255, 0.5);
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: normal;
+  color: #646cff;
+  cursor: help;
+}
+
+.multi-window-slider input[type="range"] {
+  width: 100%;
+}
+
+.slider-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 0.75rem;
+  color: #888;
+}
+
+.windows-details {
+  margin-top: 12px;
+  font-size: 0.85rem;
+}
+
+.windows-details summary {
+  cursor: pointer;
+  color: #646cff;
+  user-select: none;
+}
+
+.windows-details summary:hover {
+  text-decoration: underline;
+}
+
+.windows-list {
+  margin: 8px 0 0 20px;
+  padding: 0;
+  list-style: disc;
+  color: #aaa;
+}
+
+.windows-list li {
+  margin: 4px 0;
+}
+
+.loading-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px;
+  gap: 16px;
+}

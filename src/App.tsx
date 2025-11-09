@@ -10,6 +10,7 @@ import SpectrogramPanel from './components/SpectrogramPanel';
 import Controls from './components/Controls';
 import ModeSelector from './components/ModeSelector';
 import GenericMode, { GenericBand, genericBandsToBandSpecs } from './components/GenericMode';
+import CustomizedModePanel from './components/CustomizedModePanel';
 import { AudioPlayback } from './lib/playback';
 import { stftFrames, istft } from './lib/stft';
 import { Complex } from './lib/fft';
@@ -17,7 +18,7 @@ import { generateSpectrogram, buildGainVector } from './lib/spectrogram';
 import { FrequencyBand, EqualizerMode, PlaybackState, SpectrogramData, BandSpec, STFTOptions } from './model/types';
 import './App.css';
 
-type AppMode = 'preset' | 'generic';
+type AppMode = 'preset' | 'generic' | 'custom';
 
 function App() {
   // Audio buffers: original (immutable) and processed (EQ output)
@@ -35,6 +36,9 @@ function App() {
   
   // Generic mode state
   const [genericBands, setGenericBands] = useState<GenericBand[]>([]);
+  
+  // Customized mode state (slider scales for current mode)
+  const [customModeBandSpecs, setCustomModeBandSpecs] = useState<BandSpec[]>([]);
   
   // Dual spectrograms: input and output
   const [inputSpectrogramData, setInputSpectrogramData] = useState<SpectrogramData | null>(null);
@@ -333,6 +337,14 @@ function App() {
     await runRecompute(genericBandsToBandSpecs(newBands));
   };
 
+  const handleCustomModeBandSpecsChange = async (bandSpecs: BandSpec[]) => {
+    setCustomModeBandSpecs(bandSpecs);
+    // Guard against empty specs to avoid redundant recomputes
+    if (bandSpecs.length > 0) {
+      await runRecompute(bandSpecs);
+    }
+  };
+
   const handleModeSwitch = async (mode: AppMode) => {
     setAppMode(mode);
     
@@ -341,8 +353,11 @@ function App() {
     // Reprocess with the appropriate mode
     if (mode === 'preset') {
       await runRecompute(presetBandsToBandSpecs(bands));
-    } else {
+    } else if (mode === 'generic') {
       await runRecompute(genericBandsToBandSpecs(genericBands));
+    } else if (customModeBandSpecs.length > 0) {
+      // Only recompute if custom mode has loaded specs
+      await runRecompute(customModeBandSpecs);
     }
   };
 
@@ -395,6 +410,13 @@ function App() {
           >
             Generic Mode
           </button>
+          <button
+            className={appMode === 'custom' ? 'active' : ''}
+            onClick={() => handleModeSwitch('custom')}
+            disabled={isProcessing}
+          >
+            Customized Modes
+          </button>
         </div>
       )}
 
@@ -437,10 +459,15 @@ function App() {
                 disabled={isProcessing}
               />
             </>
-          ) : (
+          ) : appMode === 'generic' ? (
             <GenericMode
               onBandsChange={handleGenericBandsChange}
               sampleRate={originalBuffer.sampleRate}
+              disabled={isProcessing}
+            />
+          ) : (
+            <CustomizedModePanel
+              onBandSpecsChange={handleCustomModeBandSpecsChange}
               disabled={isProcessing}
             />
           )}
