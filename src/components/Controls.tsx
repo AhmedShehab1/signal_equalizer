@@ -54,16 +54,16 @@ export default function Controls({
             <label htmlFor="playback-rate">Speed:</label>
             <select 
               id="playback-rate"
-              value={playbackState.playbackRate}
+              value={playbackState.playbackRate.toString()}
               onChange={handlePlaybackRateChange}
               aria-label="Playback speed"
             >
               <option value="0.5">0.5×</option>
               <option value="0.75">0.75×</option>
-              <option value="1.0">1.0×</option>
+              <option value="1">1×</option>
               <option value="1.25">1.25×</option>
               <option value="1.5">1.5×</option>
-              <option value="2.0">2.0×</option>
+              <option value="2">2×</option>
             </select>
           </div>
         )}

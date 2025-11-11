@@ -278,6 +278,9 @@ function App() {
 
     // Set up playback with original buffer initially
     playbackRef.current.setBuffer(buffer);
+    
+    // Reset playback rate to 1.0
+    playbackRef.current.setPlaybackRate(1.0);
 
     // Generate input spectrogram
     const signal = buffer.getChannelData(0);

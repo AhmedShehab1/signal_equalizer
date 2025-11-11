@@ -129,7 +129,9 @@ export class AudioPlayback {
 
     // Start playback from pause time
     this.sourceNode.start(0, this.pauseTime);
-    this.startTime = this.audioContext.currentTime - this.pauseTime;
+    // Calculate startTime accounting for playback rate and pause position
+    // startTime represents the audioContext time when we were at position 0
+    this.startTime = this.audioContext.currentTime - (this.pauseTime / this.playbackRate);
     this.isPlaying = true;
     
     // Start notifying subscribers
@@ -142,7 +144,8 @@ export class AudioPlayback {
   pause(): void {
     if (!this.audioContext || !this.sourceNode) return;
 
-    this.pauseTime = this.audioContext.currentTime - this.startTime;
+    // Calculate current audio position (accounting for playback rate)
+    this.pauseTime = this.getCurrentTime();
     this.sourceNode.stop();
     this.sourceNode.disconnect();
     this.sourceNode = null;
@@ -176,7 +179,12 @@ export class AudioPlayback {
     if (!this.audioContext) return 0;
 
     if (this.isPlaying) {
-      return this.audioContext.currentTime - this.startTime;
+      // Calculate elapsed wall-clock time since playback started
+      const wallClockElapsed = this.audioContext.currentTime - this.startTime;
+      // Multiply by playback rate to get audio position
+      // At 0.5× speed: 10 seconds wall-clock = 5 seconds audio
+      // At 2× speed: 5 seconds wall-clock = 10 seconds audio
+      return wallClockElapsed * this.playbackRate;
     } else {
       return this.pauseTime;
     }
@@ -212,9 +220,18 @@ export class AudioPlayback {
   setPlaybackRate(rate: number): void {
     this.playbackRate = Math.max(0.25, Math.min(4.0, rate)); // Clamp to reasonable range
     
-    // If currently playing, update the source node
-    if (this.sourceNode && this.isPlaying) {
+    // If currently playing, update the source node and adjust timing
+    if (this.sourceNode && this.isPlaying && this.audioContext) {
+      // Calculate current audio position before rate change
+      const currentPosition = this.getCurrentTime();
+      
+      // Update the source node playback rate
       this.sourceNode.playbackRate.value = this.playbackRate;
+      
+      // Recalculate startTime to maintain correct position tracking
+      // startTime represents when (in audioContext time) we started from position 0
+      // We need to adjust it so getCurrentTime() returns the correct position
+      this.startTime = this.audioContext.currentTime - (currentPosition / this.playbackRate);
     }
   }
 
@@ -260,8 +277,8 @@ export class AudioPlayback {
         }
       });
       
-      // Check if playback has ended
-      if (this.buffer && currentTime >= this.buffer.duration / this.playbackRate) {
+      // Check if playback has ended (current position >= buffer duration)
+      if (this.buffer && currentTime >= this.buffer.duration) {
         this.stop();
         return;
       }
