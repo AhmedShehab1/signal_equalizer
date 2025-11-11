@@ -10,10 +10,15 @@ A web-based audio equalizer application with real-time visualization and multipl
   - **Preset Modes**: Three optimized presets (Musical, Animals, Voices)
   - **Generic Mode**: User-defined frequency subdivisions with linear gain control [0-2x]
   - **Customized Modes**: Advanced multi-window sliders for complex EQ curves (Musical Instruments, Human Voices)
-- **Dual Visualizations**:
-  - Input/Output waveform viewers with playback position indicator
-  - Input/Output spectrograms for time-frequency analysis
-- **Playback Controls**: Play, pause, stop, and seek functionality
+- **Dual Linked Viewers**: Synchronized input/output waveform visualization
+  - **Shared Pan/Zoom**: Both viewers zoom and pan together
+  - **Time Cursor Sync**: Unified playback position indicator across both waveforms
+  - **Reset View**: Quickly return to full waveform display
+- **Advanced Playback Controls**: 
+  - Play, pause, stop, and seek functionality
+  - **Variable Speed**: Adjust playback rate from 0.5× to 2× without pitch change
+  - Real-time cursor updates via subscription system
+- **Spectrograms**: Input/Output time-frequency analysis
 - **Accessibility**: Full keyboard navigation, ARIA labels, and disabled states
 
 ## Project Structure
@@ -25,9 +30,10 @@ A web-based audio equalizer application with real-time visualization and multipl
     BandsList.tsx          # Equalizer bands control (preset mode)
     GenericMode.tsx        # User-defined band editor
     CustomizedModePanel.tsx # Multi-window slider panel
-    WaveformViewer.tsx     # Waveform visualization
+    LinkedWaveformViewers.tsx # Dual synchronized waveform viewers
+    WaveformViewer.tsx     # Individual waveform visualization
     SpectrogramPanel.tsx   # Spectrogram display
-    Controls.tsx           # Playback controls
+    Controls.tsx           # Playback controls with speed selector
     ModeSelector.tsx       # Preset mode selection
   /lib
     fft.ts                 # Fast Fourier Transform implementation
@@ -102,8 +108,15 @@ npm run preview
    - **Customized Modes**: Use advanced multi-window sliders for Musical Instruments or Human Voices
 3. **Adjust Bands**: Fine-tune frequency bands using the sliders (0-2x linear gain)
 4. **Import/Export**: Save and load Generic Mode configurations via JSON
-5. **Playback**: Use the play/pause/stop controls to hear the results
-6. **Visualize**: Watch input/output waveforms and spectrograms update in real-time
+5. **Playback Controls**: 
+   - Play/pause/stop to control audio playback
+   - Adjust **playback speed** (0.5×, 0.75×, 1×, 1.25×, 1.5×, 2×) for detailed analysis
+   - Seek through the audio timeline
+6. **Synchronized Visualization**: 
+   - Both input and output waveforms **zoom and pan together**
+   - Watch the synchronized **time cursor** move across both viewers
+   - Click **Reset View** to return to full waveform display
+7. **Spectrograms**: Compare input/output time-frequency representations
 
 ## Technical Details
 
@@ -131,6 +144,15 @@ npm run preview
 - **Frequency Range**: 0 Hz to Nyquist (sample rate / 2)
 - **Dual Display**: Input (original) and Output (EQ applied) side-by-side
 
+### Dual Linked Viewers (Phase 5)
+
+- **Architecture**: `LinkedWaveformViewers` wrapper component manages shared state
+- **View Range**: Time-based API (seconds) for resolution independence
+- **Pan/Zoom Sync**: Single `WaveformViewRange` state controls both viewers
+- **Cursor Synchronization**: Subscription-based updates using `requestAnimationFrame`
+- **Playback Rate**: Web Audio API's native `sourceNode.playbackRate` for pitch-preserved speed control
+- **Performance**: `useCallback`/`useMemo` optimizations to minimize re-renders
+
 ### Multi-Window Bands
 
 Customized modes support non-contiguous frequency ranges (e.g., Guitar spanning 82-330, 660-1320, 2640-5280 Hz) controlled by a single slider. See `docs/PHASE4_IMPLEMENTATION.md` for architecture details.
@@ -141,12 +163,14 @@ Customized modes support non-contiguous frequency ranges (e.g., Guitar spanning 
 npm test
 ```
 
-**Test Coverage** (46 passing tests):
-- FFT/IFFT round-trip (3 tests)
-- STFT/ISTFT with WOLA validation (3 tests)
-- Gain vector multi-window support (2 tests)
-- Generic Mode import/export validation (22 tests)
-- Customized Mode loader and schema validation (16 tests)
+**Test Coverage** (73 passing tests):
+- **FFT/IFFT**: Round-trip validation (3 tests)
+- **STFT/ISTFT**: WOLA reconstruction (3 tests)
+- **Gain Vector**: Multi-window support (2 tests)
+- **Generic Mode**: Import/export validation (22 tests)
+- **Customized Mode**: Loader and schema validation (16 tests)
+- **Playback (Phase 5)**: Subscription system, playback rate control (18 tests)
+- **Linked Viewers (Phase 5)**: Shared state, zoom sync, cursor sync (9 tests)
 
 Test audio files are included in `/test_assets` for validating import/export functionality.
 
