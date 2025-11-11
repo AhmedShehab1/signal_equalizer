@@ -14,6 +14,7 @@ interface CustomizedModePanelProps {
 
 export default function CustomizedModePanel({ onBandSpecsChange, disabled = false }: CustomizedModePanelProps) {
   const [currentMode, setCurrentMode] = useState<CustomizedMode | null>(null);
+  const [currentModeId, setCurrentModeId] = useState<string>('');
   const [sliderScales, setSliderScales] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,6 +36,7 @@ export default function CustomizedModePanel({ onBandSpecsChange, disabled = fals
     try {
       const mode = await loadCustomizedMode(modeName);
       setCurrentMode(mode);
+      setCurrentModeId(modeName); // Track the mode ID
       
       const initialScales = initializeSliderScales(mode.sliders);
       setSliderScales(initialScales);
@@ -110,7 +112,7 @@ export default function CustomizedModePanel({ onBandSpecsChange, disabled = fals
         <div className="mode-actions">
                     <select 
             className="mode-selector-dropdown"
-            value={currentMode?.name || ''}
+            value={currentModeId}
             onChange={handleModeSelectChange}
             disabled={disabled || loading}
             aria-label="Select customized EQ mode"
