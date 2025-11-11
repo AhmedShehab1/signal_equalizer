@@ -603,3 +603,75 @@ input[type="range"]:disabled {
   padding: 40px;
   gap: 16px;
 }
+
+/* Linked Waveform Viewers */
+.linked-waveform-viewers {
+  margin: 24px 0;
+}
+
+.viewer-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+}
+
+.reset-view-button {
+  padding: 8px 16px;
+  background: rgba(100, 108, 255, 0.2);
+  border: 1px solid rgba(100, 108, 255, 0.5);
+  border-radius: 4px;
+  color: #646cff;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.reset-view-button:hover:not(:disabled) {
+  background: rgba(100, 108, 255, 0.4);
+}
+
+.reset-view-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.zoom-info {
+  color: #aaa;
+  font-size: 0.9rem;
+}
+
+.playback-rate-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 16px;
+}
+
+.playback-rate-control label {
+  color: #aaa;
+  font-size: 0.9rem;
+}
+
+.playback-rate-control select {
+  padding: 4px 8px;
+  background: rgba(100, 108, 255, 0.1);
+  border: 1px solid rgba(100, 108, 255, 0.3);
+  border-radius: 4px;
+  color: #fff;
+  cursor: pointer;
+}
+
+.playback-rate-control select:hover {
+  background: rgba(100, 108, 255, 0.2);
+}
+
+.waveform-viewer canvas {
+  cursor: grab;
+}
+
+.waveform-viewer canvas:active {
+  cursor: grabbing;
+}

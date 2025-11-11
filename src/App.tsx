@@ -5,7 +5,7 @@
 import { useState, useEffect, useRef } from 'react';
 import FileLoader from './components/FileLoader';
 import BandsList from './components/BandsList';
-import WaveformViewer from './components/WaveformViewer';
+import LinkedWaveformViewers from './components/LinkedWaveformViewers';
 import SpectrogramPanel from './components/SpectrogramPanel';
 import Controls from './components/Controls';
 import ModeSelector from './components/ModeSelector';
@@ -52,10 +52,10 @@ function App() {
     isPlaying: false,
     currentTime: 0,
     duration: 0,
+    playbackRate: 1.0,
   });
 
   const playbackRef = useRef<AudioPlayback>(new AudioPlayback());
-  const animationFrameRef = useRef<number>();
   const recomputeTokenRef = useRef<number>(0);
 
   // Map UI bands → BandSpec (preset mode: dB → linear)
@@ -228,44 +228,24 @@ function App() {
     loadModes();
   }, []);
 
-  // Initialize playback
+  // Initialize playback and subscribe to time updates
   useEffect(() => {
     const playback = playbackRef.current;
     playback.initialize();
 
+    // Subscribe to playback time updates
+    const unsubscribe = playback.subscribe((currentTime) => {
+      setPlaybackState(prev => ({
+        ...prev,
+        currentTime: Math.min(currentTime, prev.duration),
+      }));
+    });
+
     return () => {
+      unsubscribe();
       playback.dispose();
     };
   }, []);
-
-  // Update playback time
-  useEffect(() => {
-    const updateTime = () => {
-      if (playbackState.isPlaying && playbackRef.current) {
-        const currentTime = playbackRef.current.getCurrentTime();
-        setPlaybackState(prev => ({
-          ...prev,
-          currentTime: Math.min(currentTime, prev.duration),
-        }));
-
-        if (currentTime < playbackState.duration) {
-          animationFrameRef.current = requestAnimationFrame(updateTime);
-        } else {
-          setPlaybackState(prev => ({ ...prev, isPlaying: false }));
-        }
-      }
-    };
-
-    if (playbackState.isPlaying) {
-      animationFrameRef.current = requestAnimationFrame(updateTime);
-    }
-
-    return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-    };
-  }, [playbackState.isPlaying, playbackState.duration]);
 
   const handleFileLoad = async (buffer: AudioBuffer, name: string) => {
     setOriginalBuffer(buffer);
@@ -275,6 +255,7 @@ function App() {
       isPlaying: false,
       currentTime: 0,
       duration: buffer.duration,
+      playbackRate: 1.0,
     });
 
     // Initialize default bands for preset mode
@@ -385,6 +366,11 @@ function App() {
     setPlaybackState(prev => ({ ...prev, currentTime: time }));
   };
 
+  const handlePlaybackRateChange = (rate: number) => {
+    playbackRef.current.setPlaybackRate(rate);
+    setPlaybackState(prev => ({ ...prev, playbackRate: rate }));
+  };
+
   return (
     <div className="app">
       <h1>Signal Equalizer</h1>
@@ -441,6 +427,7 @@ function App() {
             onPause={handlePause}
             onStop={handleStop}
             onSeek={handleSeek}
+            onPlaybackRateChange={handlePlaybackRateChange}
           />
 
           {appMode === 'preset' ? (
@@ -472,23 +459,11 @@ function App() {
             />
           )}
 
-          <div className="viewers-container">
-            <div className="viewer-section">
-              <h2>Input Signal</h2>
-              <WaveformViewer
-                audioBuffer={originalBuffer}
-                currentTime={playbackState.currentTime}
-              />
-            </div>
-
-            <div className="viewer-section">
-              <h2>Output Signal (EQ Applied)</h2>
-              <WaveformViewer
-                audioBuffer={processedBuffer}
-                currentTime={playbackState.currentTime}
-              />
-            </div>
-          </div>
+          <LinkedWaveformViewers
+            inputBuffer={originalBuffer}
+            outputBuffer={processedBuffer}
+            currentTime={playbackState.currentTime}
+          />
 
           <div className="spectrograms-container">
             <div className="spectrogram-section">
