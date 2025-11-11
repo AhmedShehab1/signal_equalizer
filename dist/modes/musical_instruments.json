@@ -1,0 +1,62 @@
+{
+  "name": "Musical Instruments",
+  "description": "Control individual instrument frequency ranges in a musical mix",
+  "sliders": [
+    {
+      "id": "bass",
+      "label": "Bass & Kick Drum",
+      "defaultScale": 1.0,
+      "windows": [
+        { "f_start_hz": 20, "f_end_hz": 80 },
+        { "f_start_hz": 80, "f_end_hz": 250 }
+      ]
+    },
+    {
+      "id": "strings",
+      "label": "Strings & Bowed Instruments",
+      "defaultScale": 1.0,
+      "windows": [
+        { "f_start_hz": 196, "f_end_hz": 440 },
+        { "f_start_hz": 880, "f_end_hz": 1760 }
+      ]
+    },
+    {
+      "id": "vocals",
+      "label": "Vocals & Lead",
+      "defaultScale": 1.0,
+      "windows": [
+        { "f_start_hz": 300, "f_end_hz": 1000 },
+        { "f_start_hz": 2000, "f_end_hz": 4000 }
+      ]
+    },
+    {
+      "id": "guitar",
+      "label": "Guitar",
+      "defaultScale": 1.0,
+      "windows": [
+        { "f_start_hz": 82, "f_end_hz": 330 },
+        { "f_start_hz": 660, "f_end_hz": 1320 },
+        { "f_start_hz": 2640, "f_end_hz": 5280 }
+      ]
+    },
+    {
+      "id": "piano",
+      "label": "Piano & Keys",
+      "defaultScale": 1.0,
+      "windows": [
+        { "f_start_hz": 27.5, "f_end_hz": 261 },
+        { "f_start_hz": 523, "f_end_hz": 1046 },
+        { "f_start_hz": 2093, "f_end_hz": 4186 }
+      ]
+    },
+    {
+      "id": "cymbals",
+      "label": "Cymbals & Hi-Hats",
+      "defaultScale": 1.0,
+      "windows": [
+        { "f_start_hz": 4000, "f_end_hz": 8000 },
+        { "f_start_hz": 8000, "f_end_hz": 16000 }
+      ]
+    }
+  ]
+}

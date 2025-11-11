@@ -1,0 +1,65 @@
+{
+  "name": "Human Voices",
+  "description": "Control different voice characteristics and speaker profiles in audio mixes",
+  "sliders": [
+    {
+      "id": "male_fundamental",
+      "label": "Male Voice (Fundamental)",
+      "defaultScale": 1.0,
+      "windows": [
+        { "f_start_hz": 85, "f_end_hz": 180 }
+      ]
+    },
+    {
+      "id": "female_fundamental",
+      "label": "Female Voice (Fundamental)",
+      "defaultScale": 1.0,
+      "windows": [
+        { "f_start_hz": 165, "f_end_hz": 255 }
+      ]
+    },
+    {
+      "id": "child_fundamental",
+      "label": "Child Voice (Fundamental)",
+      "defaultScale": 1.0,
+      "windows": [
+        { "f_start_hz": 250, "f_end_hz": 350 }
+      ]
+    },
+    {
+      "id": "vowel_formants",
+      "label": "Vowel Clarity (Formants)",
+      "defaultScale": 1.0,
+      "windows": [
+        { "f_start_hz": 300, "f_end_hz": 800 },
+        { "f_start_hz": 800, "f_end_hz": 2500 }
+      ]
+    },
+    {
+      "id": "consonants",
+      "label": "Consonant Definition",
+      "defaultScale": 1.0,
+      "windows": [
+        { "f_start_hz": 2000, "f_end_hz": 4000 },
+        { "f_start_hz": 4000, "f_end_hz": 8000 }
+      ]
+    },
+    {
+      "id": "presence",
+      "label": "Voice Presence & Clarity",
+      "defaultScale": 1.0,
+      "windows": [
+        { "f_start_hz": 2500, "f_end_hz": 5000 }
+      ]
+    },
+    {
+      "id": "air_breathiness",
+      "label": "Air & Breathiness",
+      "defaultScale": 1.0,
+      "windows": [
+        { "f_start_hz": 8000, "f_end_hz": 12000 },
+        { "f_start_hz": 12000, "f_end_hz": 16000 }
+      ]
+    }
+  ]
+}

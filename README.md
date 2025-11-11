@@ -1,6 +1,12 @@
 # Signal Equalizer
 
-A web-based audio equalizer application with real-time visualization and multiple preset modes.
+A full-stack audio equalizer application with real-time visualization and multiple preset modes.
+
+## Architecture
+
+This is a monorepo containing:
+- **Frontend**: React + TypeScript + Vite web application
+- **Backend**: Python FastAPI server for audio processing (ready for future enhancements)
 
 ## Features
 
@@ -24,79 +30,146 @@ A web-based audio equalizer application with real-time visualization and multipl
 ## Project Structure
 
 ```
-/src
-  /components
-    FileLoader.tsx         # Audio file loading component
-    BandsList.tsx          # Equalizer bands control (preset mode)
-    GenericMode.tsx        # User-defined band editor
-    CustomizedModePanel.tsx # Multi-window slider panel
-    LinkedWaveformViewers.tsx # Dual synchronized waveform viewers
-    WaveformViewer.tsx     # Individual waveform visualization
-    SpectrogramPanel.tsx   # Spectrogram display
-    Controls.tsx           # Playback controls with speed selector
-    ModeSelector.tsx       # Preset mode selection
-  /lib
-    fft.ts                 # Fast Fourier Transform implementation
-    stft.ts                # Short-Time Fourier Transform
-    playback.ts            # Audio playback engine
-    spectrogram.ts         # Spectrogram generation + gain vector
-    modes.ts               # Customized mode loader
-  /model
-    types.ts               # TypeScript type definitions
-  App.tsx                  # Main application component
-/public
-  /modes
-    musical.json           # Musical mode preset
-    animals.json           # Animals mode preset
-    voices.json            # Voices mode preset
-    musical_instruments.json # Advanced instrument EQ
-    human_voices.json      # Advanced voice EQ
-/test_assets
-  valid-scheme-test.json   # Valid generic mode schema
-  invalid-scheme-test.json # Invalid schema for testing
-comparison.md              # Detailed mode comparison
-docs/
-  PHASE4_IMPLEMENTATION.md # Customized modes implementation details
+signal_equalizer/
+├── frontend/                  # React + TypeScript Frontend
+│   ├── src/
+│   │   ├── components/       # React components
+│   │   │   ├── FileLoader.tsx
+│   │   │   ├── BandsList.tsx
+│   │   │   ├── GenericMode.tsx
+│   │   │   ├── CustomizedModePanel.tsx
+│   │   │   ├── LinkedWaveformViewers.tsx
+│   │   │   ├── WaveformViewer.tsx
+│   │   │   ├── SpectrogramPanel.tsx
+│   │   │   ├── Controls.tsx
+│   │   │   └── ModeSelector.tsx
+│   │   ├── lib/              # Core DSP algorithms
+│   │   │   ├── fft.ts        # Fast Fourier Transform
+│   │   │   ├── stft.ts       # Short-Time Fourier Transform
+│   │   │   ├── playback.ts   # Audio playback engine
+│   │   │   ├── spectrogram.ts # Spectrogram generation
+│   │   │   └── modes.ts      # Mode management
+│   │   ├── model/
+│   │   │   └── types.ts      # TypeScript type definitions
+│   │   └── App.tsx           # Main application
+│   ├── public/
+│   │   └── modes/            # EQ mode presets (JSON)
+│   ├── package.json
+│   └── vite.config.ts
+├── backend/                   # Python FastAPI Backend
+│   ├── app/
+│   │   ├── __init__.py
+│   │   ├── main.py           # FastAPI application
+│   │   └── config.py         # Configuration
+│   ├── tests/
+│   │   └── test_main.py      # API tests
+│   ├── requirements.txt      # Python dependencies
+│   └── README.md
+├── docs/                      # Documentation
+│   ├── PHASE4_IMPLEMENTATION.md
+│   └── PHASE5_IMPLEMENTATION.md
+├── test_assets/               # Test files
+└── README.md                  # This file
 ```
 
 ## Technology Stack
 
+### Frontend
 - **React 18**: UI framework
 - **TypeScript**: Type-safe development
 - **Vite**: Build tool and dev server
 - **Web Audio API**: Audio processing and playback
 - **HTML5 Canvas**: Audio visualizations
+- **Vitest**: Testing framework
+
+### Backend
+- **Python 3.11+**: Programming language
+- **FastAPI**: Modern async web framework
+- **Uvicorn**: ASGI server
+- **NumPy & SciPy**: Scientific computing
+- **Pytest**: Testing framework
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js 16+ and npm
+- **Frontend**: Node.js 16+ and npm
+- **Backend**: Python 3.11+
 
-### Installation
+### Installation & Running
+
+#### Frontend
 
 ```bash
+cd frontend
 npm install
-```
-
-### Development
-
-```bash
 npm run dev
 ```
 
-Open your browser to `http://localhost:5173`
+Frontend will be available at `http://localhost:5173`
+
+#### Backend
+
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+python -m app.main
+```
+
+Backend API will be available at `http://localhost:8000`
+- API Docs: `http://localhost:8000/docs`
 
 ### Build
 
+#### Frontend Production Build
+
 ```bash
+cd frontend
 npm run build
+npm run preview
 ```
 
-### Preview Production Build
+#### Backend Production
 
 ```bash
-npm run preview
+cd backend
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+## Development
+
+### Frontend Testing
+
+```bash
+cd frontend
+npm test              # Run tests once
+npm run test:watch    # Watch mode
+```
+
+### Backend Testing
+
+```bash
+cd backend
+pytest                           # Run tests
+pytest --cov=app tests/         # With coverage
+```
+
+### Code Quality
+
+#### Frontend
+```bash
+cd frontend
+npm run lint
+```
+
+#### Backend
+```bash
+cd backend
+black app/ tests/     # Format
+flake8 app/ tests/    # Lint
+mypy app/             # Type check
 ```
 
 ## Usage
@@ -159,7 +232,9 @@ Customized modes support non-contiguous frequency ranges (e.g., Guitar spanning 
 
 ## Testing
 
+### Frontend Tests
 ```bash
+cd frontend
 npm test
 ```
 
@@ -171,6 +246,12 @@ npm test
 - **Customized Mode**: Loader and schema validation (16 tests)
 - **Playback (Phase 5)**: Subscription system, playback rate control (18 tests)
 - **Linked Viewers (Phase 5)**: Shared state, zoom sync, cursor sync (9 tests)
+
+### Backend Tests
+```bash
+cd backend
+pytest
+```
 
 Test audio files are included in `/test_assets` for validating import/export functionality.
 

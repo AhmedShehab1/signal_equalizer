@@ -1,0 +1,55 @@
+{
+  "name": "Animals",
+  "description": "Optimized for animal sounds with enhanced low and high frequency detail",
+  "bands": [
+    {
+      "id": "1",
+      "label": "Sub Bass",
+      "frequency": 60,
+      "gain": 4,
+      "range": [20, 100]
+    },
+    {
+      "id": "2",
+      "label": "Bass",
+      "frequency": 150,
+      "gain": 3,
+      "range": [100, 250]
+    },
+    {
+      "id": "3",
+      "label": "Low Mid",
+      "frequency": 400,
+      "gain": -1,
+      "range": [250, 500]
+    },
+    {
+      "id": "4",
+      "label": "Mid",
+      "frequency": 1000,
+      "gain": 1,
+      "range": [500, 2000]
+    },
+    {
+      "id": "5",
+      "label": "High Mid",
+      "frequency": 3000,
+      "gain": 3,
+      "range": [2000, 4000]
+    },
+    {
+      "id": "6",
+      "label": "Presence",
+      "frequency": 6000,
+      "gain": 5,
+      "range": [4000, 8000]
+    },
+    {
+      "id": "7",
+      "label": "Brilliance",
+      "frequency": 12000,
+      "gain": 6,
+      "range": [8000, 20000]
+    }
+  ]
+}
