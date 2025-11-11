@@ -2,10 +2,48 @@
 FastAPI Backend for Signal Equalizer
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import os
+import logging
+from pathlib import Path
+from typing import Final
+
+import requests
+
+from app.services.demucs_service import get_demucs_service
+
+ASSETS_DIR: Final[Path] = Path(__file__).resolve().parent.parent / "assets"
+SAMPLE_AUDIO_URL: Final[str] = "https://download.pytorch.org/torchaudio/tutorial-assets/hdemucs_mix.wav"
+SAMPLE_AUDIO_FILENAME: Final[str] = "hdemucs_mix.wav"
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+def ensure_assets_dir() -> Path:
+    """Ensure the local assets directory exists."""
+    ASSETS_DIR.mkdir(parents=True, exist_ok=True)
+    return ASSETS_DIR
+
+def fetch_sample_audio() -> Path:
+    """
+    Download the sample audio file if it is not already cached locally.
+
+    Returns:
+        Path to the cached sample audio file.
+    """
+    assets_dir = ensure_assets_dir()
+    sample_path = assets_dir / SAMPLE_AUDIO_FILENAME
+
+    if sample_path.exists():
+        return sample_path
+
+    response = requests.get(SAMPLE_AUDIO_URL, timeout=60)
+    response.raise_for_status()
+    sample_path.write_bytes(response.content)
+    return sample_path
 
 # Create FastAPI app
 app = FastAPI(
@@ -54,15 +92,116 @@ async def api_info():
     return {
         "name": "Signal Equalizer API",
         "version": "1.0.0",
-        "description": "Backend API for audio equalization processing",
+        "description": "Backend API for audio equalization and AI source separation",
         "endpoints": {
             "root": "/",
             "health": "/health",
             "info": "/api/info",
+            "separate": "/api/audio/separate",
+            "sample": "/api/audio/sample",
             "docs": "/docs",
             "openapi": "/openapi.json"
         }
     }
+
+
+@app.post("/api/audio/separate")
+async def separate_audio(
+    file: UploadFile = File(...),
+    segment: float = 10.0,
+    overlap: float = 0.1
+):
+    """
+    Separate uploaded audio file into drums, bass, vocals, and other using Hybrid Demucs.
+    
+    Args:
+        file: Audio file (WAV, MP3, FLAC, OGG)
+        segment: Segment length in seconds for processing (default: 10.0)
+        overlap: Overlap ratio between segments (default: 0.1)
+        
+    Returns:
+        JSON with separated sources and spectrograms
+    """
+    logger.info(f"Received audio separation request for file: {file.filename}")
+    
+    # Validate file type
+    allowed_extensions = {'.wav', '.mp3', '.flac', '.ogg', '.m4a'}
+    file_ext = Path(file.filename).suffix.lower()
+    
+    if file_ext not in allowed_extensions:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file format. Allowed: {', '.join(allowed_extensions)}"
+        )
+    
+    try:
+        # Read file contents
+        audio_bytes = await file.read()
+        
+        # Get Demucs service and process
+        demucs_service = get_demucs_service()
+        result = demucs_service.process_audio_file(
+            audio_bytes=audio_bytes,
+            segment=segment,
+            overlap=overlap,
+            generate_spectrograms=True
+        )
+        
+        logger.info("Audio separation completed successfully")
+        return JSONResponse(content=result)
+        
+    except Exception as e:
+        logger.error(f"Error processing audio: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error processing audio: {str(e)}"
+        )
+
+
+@app.get("/api/audio/sample")
+async def process_sample_audio(
+    segment: float = 10.0,
+    overlap: float = 0.1
+):
+    """
+    Process a sample audio file for demo purposes.
+    
+    Args:
+        segment: Segment length in seconds for processing (default: 10.0)
+        overlap: Overlap ratio between segments (default: 0.1)
+        
+    Returns:
+        JSON with separated sources and spectrograms
+    """
+    logger.info("Processing sample audio for demo")
+    
+    try:
+        # Try to load sample from torchaudio assets
+        
+        sample_path = fetch_sample_audio()
+        
+        # Read sample file
+        with open(sample_path, 'rb') as f:
+            audio_bytes = f.read()
+        
+        # Get Demucs service and process
+        demucs_service = get_demucs_service()
+        result = demucs_service.process_audio_file(
+            audio_bytes=audio_bytes,
+            segment=segment,
+            overlap=overlap,
+            generate_spectrograms=True
+        )
+        
+        logger.info("Sample audio separation completed successfully")
+        return JSONResponse(content=result)
+        
+    except Exception as e:
+        logger.error(f"Error processing sample audio: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error processing sample audio: {str(e)}"
+        )
 
 
 # Error handlers
@@ -94,5 +233,7 @@ if __name__ == "__main__":
         host=host,
         port=port,
         reload=reload,
-        log_level="info"
+        log_level="info",
+        timeout_keep_alive=300,  # 5 minutes keep-alive
+        timeout_graceful_shutdown=30,
     )

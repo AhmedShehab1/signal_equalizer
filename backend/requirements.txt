@@ -9,6 +9,15 @@ pydantic-settings==2.1.0
 numpy==1.26.2
 scipy==1.11.4
 
+# Machine Learning for Audio Source Separation
+torch==2.1.1
+torchaudio==2.1.1
+mir-eval==0.7
+
+# Image Processing for Spectrograms
+matplotlib==3.8.2
+Pillow==10.1.0
+
 # CORS
 python-cors==1.0.0
 
@@ -19,3 +28,4 @@ httpx==0.25.2
 black==23.11.0
 flake8==6.1.0
 mypy==1.7.1
+requests>=2.31.0
