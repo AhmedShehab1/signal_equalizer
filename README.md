@@ -1,17 +1,20 @@
 # Signal Equalizer
 
-A full-stack audio equalizer application with real-time visualization and multiple preset modes.
+A full-stack audio equalizer application with real-time visualization, multiple preset modes, and **AI-powered source separation**.
+
+> **🎵 NEW in Phase 6**: AI Source Separation using Hybrid Demucs! Separate any song into drums, bass, vocals, and other instruments. [See docs](./docs/PHASE6_AI_INTEGRATION.md)
 
 ## Architecture
 
 This is a monorepo containing:
 - **Frontend**: React + TypeScript + Vite web application
-- **Backend**: Python FastAPI server for audio processing (ready for future enhancements)
+- **Backend**: Python FastAPI server with Hybrid Demucs AI model for audio source separation
 
 ## Features
 
 - **Audio File Loading**: Load and play various audio formats
 - **Real-time Equalization**: Multiple EQ modes with STFT-based processing
+- **🎵 AI Source Separation**: NEW! Separate music into drums, bass, vocals, and other using Hybrid Demucs
 - **Equalizer Modes**:
   - **Preset Modes**: Three optimized presets (Musical, Animals, Voices)
   - **Generic Mode**: User-defined frequency subdivisions with linear gain control [0-2x]
@@ -24,7 +27,7 @@ This is a monorepo containing:
   - Play, pause, stop, and seek functionality
   - **Variable Speed**: Adjust playback rate from 0.5× to 2× without pitch change
   - Real-time cursor updates via subscription system
-- **Spectrograms**: Input/Output time-frequency analysis
+- **Spectrograms**: Input/Output time-frequency analysis + AI-generated spectrograms
 - **Accessibility**: Full keyboard navigation, ARIA labels, and disabled states
 
 ## Project Structure
@@ -42,12 +45,14 @@ signal_equalizer/
 │   │   │   ├── WaveformViewer.tsx
 │   │   │   ├── SpectrogramPanel.tsx
 │   │   │   ├── Controls.tsx
-│   │   │   └── ModeSelector.tsx
+│   │   │   ├── ModeSelector.tsx
+│   │   │   └── AISourceSeparation.tsx  # NEW: AI separation UI
 │   │   ├── lib/              # Core DSP algorithms
 │   │   │   ├── fft.ts        # Fast Fourier Transform
 │   │   │   ├── stft.ts       # Short-Time Fourier Transform
 │   │   │   ├── playback.ts   # Audio playback engine
 │   │   │   ├── spectrogram.ts # Spectrogram generation
+│   │   │   ├── api.ts        # NEW: Backend API client
 │   │   │   └── modes.ts      # Mode management
 │   │   ├── model/
 │   │   │   └── types.ts      # TypeScript type definitions
@@ -59,15 +64,19 @@ signal_equalizer/
 ├── backend/                   # Python FastAPI Backend
 │   ├── app/
 │   │   ├── __init__.py
-│   │   ├── main.py           # FastAPI application
-│   │   └── config.py         # Configuration
+│   │   ├── main.py           # FastAPI application + AI endpoints
+│   │   ├── config.py         # Configuration
+│   │   └── services/
+│   │       └── demucs_service.py  # NEW: Hybrid Demucs AI service
 │   ├── tests/
 │   │   └── test_main.py      # API tests
-│   ├── requirements.txt      # Python dependencies
+│   ├── requirements.txt      # Python dependencies (includes PyTorch)
+│   ├── hybrid_demucs_tutorial.ipynb  # Reference notebook
 │   └── README.md
 ├── docs/                      # Documentation
 │   ├── PHASE4_IMPLEMENTATION.md
-│   └── PHASE5_IMPLEMENTATION.md
+│   ├── PHASE5_IMPLEMENTATION.md
+│   └── PHASE6_AI_INTEGRATION.md  # NEW: AI integration docs
 ├── test_assets/               # Test files
 └── README.md                  # This file
 ```
@@ -87,6 +96,9 @@ signal_equalizer/
 - **FastAPI**: Modern async web framework
 - **Uvicorn**: ASGI server
 - **NumPy & SciPy**: Scientific computing
+- **PyTorch & TorchAudio**: Deep learning for AI source separation
+- **Hybrid Demucs**: State-of-the-art music source separation model
+- **Matplotlib**: Spectrogram generation
 - **Pytest**: Testing framework
 
 ## Getting Started
