@@ -64,6 +64,14 @@ export interface PlaybackState {
   isPlaying: boolean;
   currentTime: number;
   duration: number;
+  playbackRate: number; // Speed multiplier (0.5x, 1x, 1.5x, 2x)
+}
+
+// Waveform view range (in seconds for time-based navigation)
+export interface WaveformViewRange {
+  startTime: number; // Start of visible range in seconds
+  endTime: number;   // End of visible range in seconds
+  zoomLevel: number; // Zoom level multiplier (1.0 = full view)
 }
 
 export interface BandSpec {

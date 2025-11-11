@@ -16,6 +16,9 @@ export class AudioPlayback {
   private startTime: number = 0;
   private pauseTime: number = 0;
   private isPlaying: boolean = false;
+  private playbackRate: number = 1.0;
+  private subscribers: Set<(time: number) => void> = new Set();
+  private animationFrameId: number | null = null;
 
     // Load raw Float32 samples into the player (keeps EQ/controls)
   async loadFromFloat32(samples: Float32Array, sampleRate: number): Promise<void> {
@@ -106,6 +109,7 @@ export class AudioPlayback {
     // Create new source node (required for each playback)
     this.sourceNode = this.audioContext.createBufferSource();
     this.sourceNode.buffer = this.buffer;
+    this.sourceNode.playbackRate.value = this.playbackRate;
 
     // Create gain node
     this.gainNode = this.audioContext.createGain();
@@ -127,6 +131,9 @@ export class AudioPlayback {
     this.sourceNode.start(0, this.pauseTime);
     this.startTime = this.audioContext.currentTime - this.pauseTime;
     this.isPlaying = true;
+    
+    // Start notifying subscribers
+    this.startTimeUpdates();
   }
 
   /**
@@ -140,6 +147,9 @@ export class AudioPlayback {
     this.sourceNode.disconnect();
     this.sourceNode = null;
     this.isPlaying = false;
+    
+    // Stop time updates
+    this.stopTimeUpdates();
   }
 
   /**
@@ -154,6 +164,9 @@ export class AudioPlayback {
     this.pauseTime = 0;
     this.startTime = 0;
     this.isPlaying = false;
+    
+    // Stop time updates
+    this.stopTimeUpdates();
   }
 
   /**
@@ -194,10 +207,88 @@ export class AudioPlayback {
   }
 
   /**
+   * Set playback rate (speed)
+   */
+  setPlaybackRate(rate: number): void {
+    this.playbackRate = Math.max(0.25, Math.min(4.0, rate)); // Clamp to reasonable range
+    
+    // If currently playing, update the source node
+    if (this.sourceNode && this.isPlaying) {
+      this.sourceNode.playbackRate.value = this.playbackRate;
+    }
+  }
+
+  /**
+   * Get current playback rate
+   */
+  getPlaybackRate(): number {
+    return this.playbackRate;
+  }
+
+  /**
+   * Subscribe to time updates (called on each animation frame during playback)
+   */
+  subscribe(callback: (time: number) => void): () => void {
+    this.subscribers.add(callback);
+    
+    // Return unsubscribe function
+    return () => {
+      this.subscribers.delete(callback);
+    };
+  }
+
+  /**
+   * Start time update loop
+   */
+  private startTimeUpdates(): void {
+    if (this.animationFrameId !== null) return; // Already running
+    
+    const updateLoop = () => {
+      if (!this.isPlaying) {
+        this.animationFrameId = null;
+        return;
+      }
+      
+      const currentTime = this.getCurrentTime();
+      
+      // Notify all subscribers
+      this.subscribers.forEach(callback => {
+        try {
+          callback(currentTime);
+        } catch (error) {
+          console.error('Error in playback subscriber:', error);
+        }
+      });
+      
+      // Check if playback has ended
+      if (this.buffer && currentTime >= this.buffer.duration / this.playbackRate) {
+        this.stop();
+        return;
+      }
+      
+      this.animationFrameId = requestAnimationFrame(updateLoop);
+    };
+    
+    this.animationFrameId = requestAnimationFrame(updateLoop);
+  }
+
+  /**
+   * Stop time update loop
+   */
+  private stopTimeUpdates(): void {
+    if (this.animationFrameId !== null) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
+    }
+  }
+
+  /**
    * Cleanup resources
    */
   dispose(): void {
     this.stop();
+    this.stopTimeUpdates();
+    this.subscribers.clear();
     if (this.audioContext) {
       this.audioContext.close();
       this.audioContext = null;
