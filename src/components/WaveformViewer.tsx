@@ -3,15 +3,14 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-
-type ViewRange = { start: number; end: number };
+import { WaveformViewRange } from '../model/types';
 
 interface WaveformViewerProps {
   audioBuffer: AudioBuffer | null;
   currentTime?: number;
-  // Optional controlled view range (in sample indices) and change callback
-  viewRange?: ViewRange;
-  onViewRangeChange?: (range: ViewRange) => void;
+  viewRange?: WaveformViewRange;
+  onViewRangeChange?: (range: WaveformViewRange) => void;
+  title?: string;
 }
 
 export default function WaveformViewer({
@@ -19,9 +18,10 @@ export default function WaveformViewer({
   currentTime = 0,
   viewRange,
   onViewRangeChange,
+  title = 'Waveform',
 }: WaveformViewerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [dragStart, setDragStart] = useState<{ x: number; range: ViewRange } | null>(null);
+  const [dragStart, setDragStart] = useState<{ x: number; range: WaveformViewRange } | null>(null);
 
   // Draw waveform (uses full buffer if no viewRange is provided)
   useEffect(() => {
@@ -40,10 +40,14 @@ export default function WaveformViewer({
 
     const data = audioBuffer.getChannelData(0);
     const totalSamples = data.length;
+    const sampleRate = audioBuffer.sampleRate;
 
-    const startSample = viewRange ? Math.max(0, Math.floor(viewRange.start)) : 0;
+    // Convert time range to sample indices
+    const startSample = viewRange 
+      ? Math.max(0, Math.floor(viewRange.startTime * sampleRate)) 
+      : 0;
     const endSample = viewRange
-      ? Math.min(totalSamples - 1, Math.floor(viewRange.end))
+      ? Math.min(totalSamples - 1, Math.floor(viewRange.endTime * sampleRate))
       : totalSamples - 1;
 
     const visibleLen = Math.max(1, endSample - startSample + 1);
@@ -107,34 +111,35 @@ export default function WaveformViewer({
     const mouseX = e.clientX - rect.left;
 
     const zoomFactor = e.deltaY < 0 ? 0.9 : 1.1; // <0 => zoom in
-    const totalSamples = audioBuffer.length;
+    const totalDuration = audioBuffer.duration;
 
-    const currentRange = viewRange.end - viewRange.start;
+    const currentRange = viewRange.endTime - viewRange.startTime;
     let newRange = currentRange * zoomFactor;
 
-    // Clamp zoom level (in samples)
-    const MIN_RANGE_SAMPLES = 1000;
-    if (newRange < MIN_RANGE_SAMPLES) newRange = MIN_RANGE_SAMPLES;
-    if (newRange > totalSamples) newRange = totalSamples;
+    // Clamp zoom level (in seconds)
+    const MIN_RANGE_SECONDS = 0.1;
+    if (newRange < MIN_RANGE_SECONDS) newRange = MIN_RANGE_SECONDS;
+    if (newRange > totalDuration) newRange = totalDuration;
 
     const percent = mouseX / canvas.width;
-    const anchorPoint = viewRange.start + currentRange * percent;
+    const anchorPoint = viewRange.startTime + currentRange * percent;
 
-    let newStart = anchorPoint - newRange * percent;
-    let newEnd = newStart + newRange;
+    let newStartTime = anchorPoint - newRange * percent;
+    let newEndTime = newStartTime + newRange;
 
-    // Clamp to [0, totalSamples-1]
-    if (newStart < 0) {
-      newStart = 0;
-      newEnd = newRange;
+    // Clamp to [0, totalDuration]
+    if (newStartTime < 0) {
+      newStartTime = 0;
+      newEndTime = newRange;
     }
-    if (newEnd > totalSamples - 1) {
-      newEnd = totalSamples - 1;
-      newStart = newEnd - newRange;
-      if (newStart < 0) newStart = 0; // guard
+    if (newEndTime > totalDuration) {
+      newEndTime = totalDuration;
+      newStartTime = newEndTime - newRange;
+      if (newStartTime < 0) newStartTime = 0; // guard
     }
 
-    onViewRangeChange({ start: newStart, end: newEnd });
+    const newZoomLevel = totalDuration / newRange;
+    onViewRangeChange({ startTime: newStartTime, endTime: newEndTime, zoomLevel: newZoomLevel });
   };
 
   // Panning (mouse drag)
@@ -146,36 +151,40 @@ export default function WaveformViewer({
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!dragStart || !onViewRangeChange || !audioBuffer || !canvasRef.current) return;
 
-    const totalSamples = audioBuffer.length;
+    const totalDuration = audioBuffer.duration;
     const width = canvasRef.current.width;
 
     const dx = e.clientX - dragStart.x;
-    const samplesPerPixel = (dragStart.range.end - dragStart.range.start) / width;
-    const panAmount = dx * samplesPerPixel;
+    const rangeTime = dragStart.range.endTime - dragStart.range.startTime;
+    const secondsPerPixel = rangeTime / width;
+    const panAmount = dx * secondsPerPixel;
 
-    let newStart = dragStart.range.start - panAmount;
-    let newEnd = dragStart.range.end - panAmount;
+    let newStartTime = dragStart.range.startTime - panAmount;
+    let newEndTime = dragStart.range.endTime - panAmount;
 
     // Clamp panning
-    const rangeLen = dragStart.range.end - dragStart.range.start;
-    if (newStart < 0) {
-      newStart = 0;
-      newEnd = rangeLen;
+    if (newStartTime < 0) {
+      newStartTime = 0;
+      newEndTime = rangeTime;
     }
-    if (newEnd > totalSamples - 1) {
-      newEnd = totalSamples - 1;
-      newStart = newEnd - rangeLen;
-      if (newStart < 0) newStart = 0;
+    if (newEndTime > totalDuration) {
+      newEndTime = totalDuration;
+      newStartTime = newEndTime - rangeTime;
+      if (newStartTime < 0) newStartTime = 0;
     }
 
-    onViewRangeChange({ start: newStart, end: newEnd });
+    onViewRangeChange({ 
+      startTime: newStartTime, 
+      endTime: newEndTime, 
+      zoomLevel: totalDuration / rangeTime 
+    });
   };
 
   const handleMouseUp = () => setDragStart(null);
 
   return (
     <div className="waveform-viewer">
-      <h3>Waveform</h3>
+      <h3>{title}</h3>
       <canvas
         ref={canvasRef}
         width={800}
