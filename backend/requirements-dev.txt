@@ -1,0 +1,15 @@
+# Development Dependencies
+-r requirements.txt
+
+# Testing
+pytest-cov==4.1.0
+pytest-mock==3.12.0
+
+# Code Quality
+pylint==3.0.3
+isort==5.13.2
+autopep8==2.0.4
+
+# Documentation
+mkdocs==1.5.3
+mkdocs-material==9.5.2
