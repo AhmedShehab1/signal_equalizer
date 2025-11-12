@@ -354,6 +354,20 @@ function App() {
     }
   };
 
+  const handleAIMixedAudio = (mixedBuffer: AudioBuffer) => {
+    // Set the mixed audio as the processed buffer for playback
+    setProcessedBuffer(mixedBuffer);
+    
+    // Update playback to use the new buffer
+    playbackRef.current.setBuffer(mixedBuffer);
+    
+    // Generate spectrogram for the mixed output
+    const channelData = mixedBuffer.getChannelData(0);
+    const samples = Array.from(channelData);
+    const spectrogramData = generateSpectrogram(samples, mixedBuffer.sampleRate, 2048, 512);
+    setOutputSpectrogramData(spectrogramData);
+  };
+
   const handleModeSwitch = async (mode: AppMode) => {
     setAppMode(mode);
     
@@ -497,6 +511,7 @@ function App() {
               onBandSpecsChange={handleCustomModeBandSpecsChange}
               disabled={isProcessing}
               audioFile={audioFile}
+              onAudioMixed={handleAIMixedAudio}
             />
           ) : null}
 
