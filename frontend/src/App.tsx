@@ -401,16 +401,6 @@ function App() {
     <div className="app">
       <h1>Signal Equalizer</h1>
       
-      {/* Quick access to AI separation - always visible */}
-      <div className="quick-access">
-        <button
-          className="btn-ai-quick"
-          onClick={() => handleModeSwitch('ai-separation')}
-        >
-          🎵 Try AI Source Separation (No file needed!)
-        </button>
-      </div>
-      
       <FileLoader onFileLoad={handleFileLoad} />
       
       {fileName && <p>Loaded: {fileName}</p>}
