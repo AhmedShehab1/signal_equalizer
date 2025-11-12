@@ -1,23 +1,95 @@
 /**
  * Customized Mode Panel: Renders multi-window sliders for advanced EQ modes
+ * or AI-based speech separation controls (DSP vs AI toggle)
  */
 
 import { useState, useEffect } from 'react';
 import { CustomizedMode, SliderSpec, BandSpec } from '../model/types';
 import { loadCustomizedMode, initializeSliderScales, validateScale, buildBandSpecsFromSliders } from '../lib/modes';
 import { AVAILABLE_CUSTOMIZED_MODES } from '../config/customizedModes';
+import { separateSpeechAudio, getSourceLabel, type SpeechSeparationResult } from '../lib/api';
+
+type ProcessingMode = 'dsp' | 'ai';
 
 interface CustomizedModePanelProps {
   onBandSpecsChange: (bandSpecs: BandSpec[]) => void;
   disabled?: boolean;
+  audioFile?: File | null;
 }
 
-export default function CustomizedModePanel({ onBandSpecsChange, disabled = false }: CustomizedModePanelProps) {
+export default function CustomizedModePanel({ onBandSpecsChange, disabled = false, audioFile = null }: CustomizedModePanelProps) {
+  // Processing mode state
+  const [processingMode, setProcessingMode] = useState<ProcessingMode>('dsp');
+  
+  // DSP mode state (existing)
   const [currentMode, setCurrentMode] = useState<CustomizedMode | null>(null);
   const [currentModeId, setCurrentModeId] = useState<string>('');
   const [sliderScales, setSliderScales] = useState<Map<string, number>>(new Map());
+  
+  // AI mode state
+  const [speechResult, setSpeechResult] = useState<SpeechSeparationResult | null>(null);
+  const [sourceGains, setSourceGains] = useState<Map<string, number>>(new Map());
+  const [aiProcessing, setAiProcessing] = useState<boolean>(false);
+  
+  // Shared state
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Mode switching handler - ensures mutual exclusivity
+  const handleModeSwitch = (newMode: ProcessingMode) => {
+    if (newMode === processingMode) return;
+    
+    setProcessingMode(newMode);
+    setError(null);
+    
+    if (newMode === 'dsp') {
+      // Clear AI state when switching to DSP
+      setSpeechResult(null);
+      setSourceGains(new Map());
+      setAiProcessing(false);
+    } else {
+      // Clear DSP state when switching to AI
+      setSliderScales(new Map());
+      onBandSpecsChange([]);
+    }
+  };
+
+  // AI mode: Handle file processing
+  const handleProcessAudio = async () => {
+    if (!audioFile) {
+      setError('Please select an audio file first');
+      return;
+    }
+
+    setAiProcessing(true);
+    setError(null);
+
+    try {
+      const result = await separateSpeechAudio(audioFile, 8); // 8 second max
+      setSpeechResult(result);
+      
+      // Initialize gain controls for each source
+      const initialGains = new Map<string, number>();
+      Object.keys(result.sources).forEach(sourceKey => {
+        initialGains.set(sourceKey, 1.0); // Default gain = 1.0
+      });
+      setSourceGains(initialGains);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to process audio');
+      setSpeechResult(null);
+    } finally {
+      setAiProcessing(false);
+    }
+  };
+
+  // AI mode: Handle source gain changes
+  const handleSourceGainChange = (sourceKey: string, gain: number) => {
+    setSourceGains(prev => {
+      const updated = new Map(prev);
+      updated.set(sourceKey, gain);
+      return updated;
+    });
+  };
 
   // Load first mode on mount
   useEffect(() => {
@@ -90,55 +162,144 @@ export default function CustomizedModePanel({ onBandSpecsChange, disabled = fals
       <div className="customized-mode-panel">
         <div className="error-message">
           <p>{error}</p>
-          <button onClick={() => handleModeSelect(AVAILABLE_CUSTOMIZED_MODES[0])}>
-            Retry
-          </button>
+          {processingMode === 'dsp' ? (
+            <button onClick={() => handleModeSelect(AVAILABLE_CUSTOMIZED_MODES[0])}>
+              Retry
+            </button>
+          ) : (
+            <button onClick={handleProcessAudio} disabled={!audioFile || aiProcessing}>
+              Retry
+            </button>
+          )}
         </div>
       </div>
     );
   }
 
-  if (!currentMode) {
-    return null;
-  }
-
   return (
     <div className="customized-mode-panel">
-      <div className="mode-header">
-        <div className="mode-info">
-          <h2>{currentMode.name}</h2>
-          <p className="mode-description">{currentMode.description}</p>
-        </div>
-        <div className="mode-actions">
-                    <select 
-            className="mode-selector-dropdown"
-            value={currentModeId}
-            onChange={handleModeSelectChange}
-            disabled={disabled || loading}
-            aria-label="Select customized EQ mode"
+      {/* Processing Mode Toggle */}
+      <div className="processing-mode-toggle">
+        <label className="toggle-label">Processing Mode:</label>
+        <div className="toggle-buttons">
+          <button
+            className={`toggle-button ${processingMode === 'dsp' ? 'active' : ''}`}
+            onClick={() => handleModeSwitch('dsp')}
+            disabled={disabled || loading || aiProcessing}
           >
-            {AVAILABLE_CUSTOMIZED_MODES.map((modeName: string) => (
-              <option key={modeName} value={modeName}>
-                {modeName.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}
-              </option>
-            ))}
-          </select>
-          <button onClick={handleReset} disabled={disabled} className="reset-button">
-            Reset to Defaults
+            DSP (Band EQ)
+          </button>
+          <button
+            className={`toggle-button ${processingMode === 'ai' ? 'active' : ''}`}
+            onClick={() => handleModeSwitch('ai')}
+            disabled={disabled || loading}
+          >
+            AI (Speech Separation)
           </button>
         </div>
       </div>
 
-      <fieldset disabled={disabled} className="sliders-container">
-        {currentMode.sliders.map((slider) => (
-          <MultiWindowSlider
-            key={slider.id}
-            slider={slider}
-            value={sliderScales.get(slider.id) ?? slider.defaultScale}
-            onChange={(value) => handleSliderChange(slider.id, value)}
-          />
-        ))}
-      </fieldset>
+      {/* DSP Mode Rendering */}
+      {processingMode === 'dsp' && currentMode && (
+        <>
+          <div className="mode-header">
+            <div className="mode-info">
+              <h2>{currentMode.name}</h2>
+              <p className="mode-description">{currentMode.description}</p>
+            </div>
+            <div className="mode-actions">
+              <select 
+                className="mode-selector-dropdown"
+                value={currentModeId}
+                onChange={handleModeSelectChange}
+                disabled={disabled || loading}
+                aria-label="Select customized EQ mode"
+              >
+                {AVAILABLE_CUSTOMIZED_MODES.map((modeName: string) => (
+                  <option key={modeName} value={modeName}>
+                    {modeName.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}
+                  </option>
+                ))}
+              </select>
+              <button onClick={handleReset} disabled={disabled} className="reset-button">
+                Reset to Defaults
+              </button>
+            </div>
+          </div>
+
+          <fieldset disabled={disabled} className="sliders-container">
+            {currentMode.sliders.map((slider) => (
+              <MultiWindowSlider
+                key={slider.id}
+                slider={slider}
+                value={sliderScales.get(slider.id) ?? slider.defaultScale}
+                onChange={(value) => handleSliderChange(slider.id, value)}
+              />
+            ))}
+          </fieldset>
+        </>
+      )}
+
+      {/* AI Mode Rendering */}
+      {processingMode === 'ai' && (
+        <div className="ai-mode-container">
+          <div className="ai-mode-header">
+            <h2>Speech Source Separation</h2>
+            <p className="mode-description">
+              Upload audio to separate speech sources using AI. Adjust gain for each detected source.
+            </p>
+          </div>
+
+          <div className="ai-actions">
+            <button
+              onClick={handleProcessAudio}
+              disabled={!audioFile || aiProcessing || disabled}
+              className="process-button"
+            >
+              {aiProcessing ? 'Processing...' : 'Separate Sources'}
+            </button>
+            {!audioFile && (
+              <p className="info-message">Please select an audio file first</p>
+            )}
+          </div>
+
+          {speechResult && (
+            <div className="source-controls">
+              <h3>Detected Sources: {speechResult.num_sources}</h3>
+              <div className="sources-container">
+                {Object.entries(speechResult.sources).map(([sourceKey, sourceData]) => (
+                  <div key={sourceKey} className="source-control">
+                    <div className="source-header">
+                      <label htmlFor={`gain-${sourceKey}`}>
+                        {getSourceLabel(sourceKey)}
+                      </label>
+                      <span className="gain-value">
+                        {(sourceGains.get(sourceKey) ?? 1.0).toFixed(2)}×
+                      </span>
+                    </div>
+                    <input
+                      id={`gain-${sourceKey}`}
+                      type="range"
+                      min="0"
+                      max="2"
+                      step="0.01"
+                      value={sourceGains.get(sourceKey) ?? 1.0}
+                      onChange={(e) => handleSourceGainChange(sourceKey, parseFloat(e.target.value))}
+                      disabled={disabled}
+                      className="gain-slider"
+                    />
+                    <div className="source-info">
+                      <span className="source-shape">
+                        Shape: {sourceData.audio_shape.join(' × ')}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
