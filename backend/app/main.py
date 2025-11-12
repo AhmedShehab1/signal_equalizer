@@ -13,10 +13,12 @@ from typing import Final
 import requests
 
 from app.services.demucs_service import get_demucs_service
+from app.services.dprnn_service import get_dprnn_service
 
 ASSETS_DIR: Final[Path] = Path(__file__).resolve().parent.parent / "assets"
 SAMPLE_AUDIO_URL: Final[str] = "https://download.pytorch.org/torchaudio/tutorial-assets/hdemucs_mix.wav"
 SAMPLE_AUDIO_FILENAME: Final[str] = "hdemucs_mix.wav"
+SPEECH_SAMPLE_FILENAME: Final[str] = "5_mixture.wav"  # Speech separation demo sample
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -99,6 +101,8 @@ async def api_info():
             "info": "/api/info",
             "separate": "/api/audio/separate",
             "sample": "/api/audio/sample",
+            "speech_separate": "/api/audio/speech-separate",
+            "speech_sample": "/api/audio/speech-sample",
             "docs": "/docs",
             "openapi": "/openapi.json"
         }
@@ -203,6 +207,145 @@ async def process_demo_sample(
         raise HTTPException(
             status_code=500,
             detail=f"Error processing demo sample: {str(e)}"
+        )
+
+
+@app.post("/api/audio/speech-separate")
+async def separate_speech_file(
+    file: UploadFile = File(...),
+    max_duration: float = 8.0
+):
+    """
+    Upload and separate speech sources from an audio file.
+    
+    Uses Multi-Decoder DPRNN model to separate speech into individual speakers.
+    Optimized for speech/conversation audio (8kHz, 8-second default max duration).
+    
+    Args:
+        file: Audio file to process (wav, mp3, flac, ogg, m4a)
+        max_duration: Maximum duration to process in seconds (default: 8.0)
+        
+    Returns:
+        JSON with separated speech sources and spectrograms:
+        {
+            "sample_rate": 8000,
+            "num_sources": 2,
+            "sources": {
+                "source_0": {
+                    "audio_data": [...],
+                    "audio_shape": [samples],
+                    "spectrogram": "data:image/png;base64,..."
+                },
+                "source_1": {...}
+            },
+            "mixture_spectrogram": "data:image/png;base64,..."
+        }
+    """
+    logger.info(f"Received speech separation request for file: {file.filename}")
+    
+    # Validate file type
+    allowed_extensions = {'.wav', '.mp3', '.flac', '.ogg', '.m4a'}
+    file_ext = Path(file.filename).suffix.lower()
+    
+    if file_ext not in allowed_extensions:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file format. Allowed: {', '.join(allowed_extensions)}"
+        )
+    
+    # Validate max_duration
+    if max_duration <= 0 or max_duration > 30:
+        raise HTTPException(
+            status_code=400,
+            detail="max_duration must be between 0 and 30 seconds"
+        )
+    
+    try:
+        # Read file contents
+        audio_bytes = await file.read()
+        
+        logger.info(f"Processing speech audio (max_duration={max_duration}s)...")
+        
+        # Get DPRNN service and process
+        dprnn_service = get_dprnn_service()
+        result = dprnn_service.process_audio_file(
+            audio_bytes=audio_bytes,
+            max_duration=max_duration,
+            generate_spectrograms=True
+        )
+        
+        logger.info(f"Speech separation completed: {result['num_sources']} source(s) detected")
+        return JSONResponse(content=result)
+        
+    except Exception as e:
+        logger.error(f"Error processing speech audio: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error processing speech audio: {str(e)}"
+        )
+
+
+@app.get("/api/audio/speech-sample")
+async def process_speech_demo_sample(
+    max_duration: float = 8.0,
+    spectrograms: bool = True
+):
+    """
+    Process the built-in speech demo sample for demonstration purposes.
+    
+    Uses a pre-loaded speech mixture with multiple speakers to demonstrate
+    the Multi-Decoder DPRNN speech separation capabilities.
+    
+    Args:
+        max_duration: Maximum duration to process in seconds (default: 8.0)
+        spectrograms: Whether to generate spectrograms (default: True)
+        
+    Returns:
+        JSON with separated speech sources and optionally spectrograms
+    """
+    logger.info(f"Processing speech demo sample (max_duration={max_duration}s, spectrograms={spectrograms})")
+    
+    # Validate max_duration
+    if max_duration <= 0 or max_duration > 30:
+        raise HTTPException(
+            status_code=400,
+            detail="max_duration must be between 0 and 30 seconds"
+        )
+    
+    try:
+        # Load speech sample audio from assets
+        sample_path = ASSETS_DIR / SPEECH_SAMPLE_FILENAME
+        
+        if not sample_path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=f"Speech sample file not found: {SPEECH_SAMPLE_FILENAME}"
+            )
+        
+        # Read sample file
+        with open(sample_path, 'rb') as f:
+            audio_bytes = f.read()
+        
+        logger.info(f"Loaded speech sample from {sample_path}")
+        
+        # Get DPRNN service and process
+        dprnn_service = get_dprnn_service()
+        result = dprnn_service.process_audio_file(
+            audio_bytes,
+            max_duration=max_duration,
+            generate_spectrograms=spectrograms
+        )
+        
+        logger.info(f"Speech demo sample processing completed: {result['num_sources']} source(s) detected")
+        return JSONResponse(content=result)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error processing speech demo sample: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error processing speech demo sample: {str(e)}"
         )
 
 

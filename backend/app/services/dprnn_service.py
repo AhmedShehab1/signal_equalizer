@@ -77,14 +77,18 @@ class DPRNNService(BaseAudioService):
         Apply model to separate speech sources.
         
         Args:
-            mix: Input audio tensor [batch, channels, length]
+            mix: Input audio tensor [batch, channels, length] or [channels, length]
             
         Returns:
             Tuple of:
                 - Separated sources tensor [num_sources, length]
                 - Number of detected sources
         """
-        batch, channels, length = mix.shape
+        # Remove batch dimension if present
+        if mix.dim() == 3:
+            mix = mix.squeeze(0)  # [batch, channels, length] -> [channels, length]
+        
+        channels, length = mix.shape
         total_duration = length / self.sample_rate
         
         logger.info(f"Processing {total_duration:.1f}s audio for source separation")
@@ -92,12 +96,12 @@ class DPRNNService(BaseAudioService):
         # Handle stereo by converting to mono (take first channel)
         if channels > 1:
             logger.info(f"Converting {channels} channels to mono")
-            mix = mix[:, 0:1, :]  # Take first channel only
+            mix = mix[0:1, :]  # Take first channel only [1, length]
         
         # Move to device
         mix = mix.to(self.device)
         
-        # Separate sources
+        # Separate sources - model expects [channels, samples]
         with torch.no_grad():
             sources_est = self.model.separate(mix).cpu()
         
@@ -130,11 +134,7 @@ class DPRNNService(BaseAudioService):
         # Prepare input (convert to mono if stereo)
         waveform = self.prepare_input(waveform, target_channels=1)
         
-        # Add batch dimension for model
-        if waveform.dim() == 2:
-            waveform = waveform.unsqueeze(0)
-        
-        # Separate sources
+        # Separate sources (model expects [channels, samples], not batched)
         sources_est, num_sources = self.separate_sources(waveform)
         
         # Prepare result dictionary
@@ -147,7 +147,8 @@ class DPRNNService(BaseAudioService):
         # Generate spectrograms if requested
         if generate_spectrograms:
             # Generate spectrogram for original mixture
-            mixture_for_spec = waveform[0, 0].cpu().numpy()
+            # waveform is [channels, samples], take first channel
+            mixture_for_spec = waveform[0].cpu().numpy()
             
             result["mixture_spectrogram"] = self.generate_spectrogram(
                 mixture_for_spec,
