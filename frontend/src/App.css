@@ -627,6 +627,212 @@ input[type="range"]:disabled {
   gap: 16px;
 }
 
+/* Processing Mode Toggle */
+.processing-mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding: 16px;
+  background: rgba(100, 108, 255, 0.05);
+  border: 1px solid rgba(100, 108, 255, 0.2);
+  border-radius: 8px;
+}
+
+.toggle-label {
+  font-weight: 600;
+  color: #646cff;
+}
+
+.toggle-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.toggle-button {
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  color: #aaa;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.9rem;
+}
+
+.toggle-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(100, 108, 255, 0.5);
+}
+
+.toggle-button.active {
+  background: rgba(100, 108, 255, 0.3);
+  border-color: #646cff;
+  color: #fff;
+  font-weight: 600;
+}
+
+.toggle-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* AI Mode Container */
+.ai-mode-container {
+  margin-top: 16px;
+}
+
+.ai-mode-header h2 {
+  margin: 0 0 8px 0;
+  color: #646cff;
+}
+
+.ai-mode-header .mode-description {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #aaa;
+}
+
+.ai-actions {
+  margin: 16px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.process-button {
+  padding: 12px 24px;
+  background: linear-gradient(135deg, rgba(100, 108, 255, 0.3), rgba(255, 100, 200, 0.3));
+  border: 1px solid rgba(100, 108, 255, 0.5);
+  border-radius: 6px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.process-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(100, 108, 255, 0.5), rgba(255, 100, 200, 0.5));
+  box-shadow: 0 4px 12px rgba(100, 108, 255, 0.3);
+}
+
+.process-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.info-message {
+  margin: 0;
+  padding: 8px 12px;
+  background: rgba(255, 165, 0, 0.1);
+  border: 1px solid rgba(255, 165, 0, 0.3);
+  border-radius: 4px;
+  color: #ffa500;
+  font-size: 0.85rem;
+}
+
+/* Source Controls */
+.source-controls {
+  margin-top: 24px;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+}
+
+.source-controls h3 {
+  margin: 0 0 16px 0;
+  color: #fff;
+  font-size: 1.1rem;
+}
+
+.sources-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.source-control {
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+}
+
+.source-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.source-header label {
+  font-weight: 600;
+  color: #fff;
+  font-size: 1rem;
+}
+
+.gain-value {
+  color: #646cff;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.gain-slider {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+
+.gain-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  background: linear-gradient(135deg, #646cff, #ff64c8);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s;
+}
+
+.gain-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.gain-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  background: linear-gradient(135deg, #646cff, #ff64c8);
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s;
+}
+
+.gain-slider::-moz-range-thumb:hover {
+  transform: scale(1.2);
+}
+
+.source-info {
+  display: flex;
+  gap: 12px;
+  font-size: 0.85rem;
+  color: #888;
+}
+
+.source-shape {
+  padding: 4px 8px;
+  background: rgba(100, 108, 255, 0.1);
+  border-radius: 4px;
+  font-family: monospace;
+}
+
 /* Linked Waveform Viewers */
 .linked-waveform-viewers {
   margin: 24px 0;

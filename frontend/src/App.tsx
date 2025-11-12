@@ -26,6 +26,7 @@ function App() {
   const [originalBuffer, setOriginalBuffer] = useState<AudioBuffer | null>(null);
   const [processedBuffer, setProcessedBuffer] = useState<AudioBuffer | null>(null);
   const [fileName, setFileName] = useState<string>('');
+  const [audioFile, setAudioFile] = useState<File | null>(null); // Track raw file for AI processing
   
   // Mode switcher
   const [appMode, setAppMode] = useState<AppMode>('preset');
@@ -270,10 +271,11 @@ function App() {
     };
   }, []);
 
-  const handleFileLoad = async (buffer: AudioBuffer, name: string) => {
+  const handleFileLoad = async (buffer: AudioBuffer, name: string, file: File) => {
     setOriginalBuffer(buffer);
     setProcessedBuffer(null);
     setFileName(name);
+    setAudioFile(file); // Store raw file for AI processing
     setPlaybackState({
       isPlaying: false,
       currentTime: 0,
@@ -494,6 +496,7 @@ function App() {
             <CustomizedModePanel
               onBandSpecsChange={handleCustomModeBandSpecsChange}
               disabled={isProcessing}
+              audioFile={audioFile}
             />
           ) : null}
 
