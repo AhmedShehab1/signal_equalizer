@@ -15,9 +15,10 @@ interface CustomizedModePanelProps {
   onBandSpecsChange: (bandSpecs: BandSpec[]) => void;
   disabled?: boolean;
   audioFile?: File | null;
+  onAudioMixed?: (mixedBuffer: AudioBuffer) => void; // Callback for AI mixed audio
 }
 
-export default function CustomizedModePanel({ onBandSpecsChange, disabled = false, audioFile = null }: CustomizedModePanelProps) {
+export default function CustomizedModePanel({ onBandSpecsChange, disabled = false, audioFile = null, onAudioMixed }: CustomizedModePanelProps) {
   // Processing mode state
   const [processingMode, setProcessingMode] = useState<ProcessingMode>('dsp');
   
@@ -30,6 +31,10 @@ export default function CustomizedModePanel({ onBandSpecsChange, disabled = fals
   const [speechResult, setSpeechResult] = useState<SpeechSeparationResult | null>(null);
   const [sourceGains, setSourceGains] = useState<Map<string, number>>(new Map());
   const [aiProcessing, setAiProcessing] = useState<boolean>(false);
+  const [sourceBuffers, setSourceBuffers] = useState<Map<string, AudioBuffer>>(new Map());
+  const [playingSource, setPlayingSource] = useState<string | null>(null); // Track which source is playing
+  const [audioContext] = useState<AudioContext>(() => new AudioContext());
+  const [currentSourceNode, setCurrentSourceNode] = useState<AudioBufferSourceNode | null>(null);
   
   // Shared state
   const [loading, setLoading] = useState<boolean>(false);
@@ -68,12 +73,22 @@ export default function CustomizedModePanel({ onBandSpecsChange, disabled = fals
       const result = await separateSpeechAudio(audioFile, 8); // 8 second max
       setSpeechResult(result);
       
+      // Convert sources to AudioBuffers
+      const buffers = await convertSourcesToBuffers(result);
+      setSourceBuffers(buffers);
+      
       // Initialize gain controls for each source
       const initialGains = new Map<string, number>();
       Object.keys(result.sources).forEach(sourceKey => {
         initialGains.set(sourceKey, 1.0); // Default gain = 1.0
       });
       setSourceGains(initialGains);
+      
+      // Create initial mix with default gains
+      if (onAudioMixed) {
+        const mixed = mixSources(buffers, initialGains);
+        onAudioMixed(mixed);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to process audio');
       setSpeechResult(null);
@@ -89,6 +104,136 @@ export default function CustomizedModePanel({ onBandSpecsChange, disabled = fals
       updated.set(sourceKey, gain);
       return updated;
     });
+    
+    // Remix audio with new gains
+    if (speechResult && sourceBuffers.size > 0) {
+      mixAndNotifyParent();
+    }
+  };
+
+  // Convert speech separation result to AudioBuffers
+  const convertSourcesToBuffers = async (result: SpeechSeparationResult): Promise<Map<string, AudioBuffer>> => {
+    const buffers = new Map<string, AudioBuffer>();
+    
+    for (const [sourceKey, sourceData] of Object.entries(result.sources)) {
+      const audioData = sourceData.audio_data;
+      const sampleRate = result.sample_rate;
+      
+      // Create AudioBuffer (mono audio)
+      const buffer = audioContext.createBuffer(1, audioData.length, sampleRate);
+      const channelData = buffer.getChannelData(0);
+      
+      // Copy audio data
+      for (let i = 0; i < audioData.length; i++) {
+        channelData[i] = audioData[i];
+      }
+      
+      buffers.set(sourceKey, buffer);
+    }
+    
+    return buffers;
+  };
+
+  // Mix all sources with their respective gains
+  const mixSources = (buffers: Map<string, AudioBuffer>, gains: Map<string, number>): AudioBuffer => {
+    if (buffers.size === 0) {
+      throw new Error('No source buffers to mix');
+    }
+    
+    // Get first buffer to determine size and sample rate
+    const firstBuffer = Array.from(buffers.values())[0];
+    const length = firstBuffer.length;
+    const sampleRate = firstBuffer.sampleRate;
+    
+    // Create output buffer (mono)
+    const mixedBuffer = audioContext.createBuffer(1, length, sampleRate);
+    const mixedData = mixedBuffer.getChannelData(0);
+    
+    // Mix all sources
+    for (const [sourceKey, buffer] of buffers.entries()) {
+      const gain = gains.get(sourceKey) ?? 1.0;
+      const sourceData = buffer.getChannelData(0);
+      
+      for (let i = 0; i < length; i++) {
+        mixedData[i] += sourceData[i] * gain;
+      }
+    }
+    
+    // Normalize to prevent clipping
+    let maxVal = 0;
+    for (let i = 0; i < length; i++) {
+      maxVal = Math.max(maxVal, Math.abs(mixedData[i]));
+    }
+    if (maxVal > 1.0) {
+      for (let i = 0; i < length; i++) {
+        mixedData[i] /= maxVal;
+      }
+    }
+    
+    return mixedBuffer;
+  };
+
+  // Mix sources and notify parent component
+  const mixAndNotifyParent = () => {
+    if (!speechResult || sourceBuffers.size === 0 || !onAudioMixed) return;
+    
+    try {
+      const mixed = mixSources(sourceBuffers, sourceGains);
+      onAudioMixed(mixed);
+    } catch (err) {
+      console.error('Failed to mix sources:', err);
+      setError('Failed to mix audio sources');
+    }
+  };
+
+  // Play individual source
+  const playSource = (sourceKey: string) => {
+    const buffer = sourceBuffers.get(sourceKey);
+    if (!buffer) return;
+    
+    // Stop current playback
+    stopPlayback();
+    
+    // Create source node
+    const sourceNode = audioContext.createBufferSource();
+    sourceNode.buffer = buffer;
+    
+    // Apply gain
+    const gainNode = audioContext.createGain();
+    gainNode.gain.value = sourceGains.get(sourceKey) ?? 1.0;
+    
+    // Connect and play
+    sourceNode.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    sourceNode.onended = () => {
+      setPlayingSource(null);
+      setCurrentSourceNode(null);
+    };
+    
+    sourceNode.start(0);
+    setCurrentSourceNode(sourceNode);
+    setPlayingSource(sourceKey);
+  };
+
+  // Stop current playback
+  const stopPlayback = () => {
+    if (currentSourceNode) {
+      try {
+        currentSourceNode.stop();
+      } catch (e) {
+        // Already stopped
+      }
+      setCurrentSourceNode(null);
+    }
+    setPlayingSource(null);
+  };
+
+  // Mute/unmute source (set gain to 0 or restore)
+  const toggleMute = (sourceKey: string) => {
+    const currentGain = sourceGains.get(sourceKey) ?? 1.0;
+    const newGain = currentGain === 0 ? 1.0 : 0;
+    handleSourceGainChange(sourceKey, newGain);
   };
 
   // Load first mode on mount
@@ -265,7 +410,16 @@ export default function CustomizedModePanel({ onBandSpecsChange, disabled = fals
 
           {speechResult && (
             <div className="source-controls">
-              <h3>Detected Sources: {speechResult.num_sources}</h3>
+              <div className="source-controls-header">
+                <h3>Detected Sources: {speechResult.num_sources}</h3>
+                <button
+                  onClick={stopPlayback}
+                  disabled={!playingSource}
+                  className="stop-all-button"
+                >
+                  ⏹ Stop Playback
+                </button>
+              </div>
               <div className="sources-container">
                 {Object.entries(speechResult.sources).map(([sourceKey, sourceData]) => (
                   <div key={sourceKey} className="source-control">
@@ -273,9 +427,27 @@ export default function CustomizedModePanel({ onBandSpecsChange, disabled = fals
                       <label htmlFor={`gain-${sourceKey}`}>
                         {getSourceLabel(sourceKey)}
                       </label>
-                      <span className="gain-value">
-                        {(sourceGains.get(sourceKey) ?? 1.0).toFixed(2)}×
-                      </span>
+                      <div className="source-actions">
+                        <button
+                          onClick={() => playSource(sourceKey)}
+                          disabled={disabled || playingSource === sourceKey}
+                          className="play-button"
+                          title="Play this source"
+                        >
+                          {playingSource === sourceKey ? '⏸ Playing' : '▶ Play'}
+                        </button>
+                        <button
+                          onClick={() => toggleMute(sourceKey)}
+                          disabled={disabled}
+                          className={`mute-button ${sourceGains.get(sourceKey) === 0 ? 'muted' : ''}`}
+                          title={sourceGains.get(sourceKey) === 0 ? 'Unmute' : 'Mute'}
+                        >
+                          {sourceGains.get(sourceKey) === 0 ? '🔇 Muted' : '🔊 Mute'}
+                        </button>
+                        <span className="gain-value">
+                          {(sourceGains.get(sourceKey) ?? 1.0).toFixed(2)}×
+                        </span>
+                      </div>
                     </div>
                     <input
                       id={`gain-${sourceKey}`}
