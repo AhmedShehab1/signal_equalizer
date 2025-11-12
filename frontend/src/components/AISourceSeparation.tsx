@@ -20,11 +20,21 @@ export const AISourceSeparation: React.FC = () => {
   const [result, setResult] = useState<SeparationResult | null>(null);
   const [sources, setSources] = useState<SourceResult[]>([]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [audioKey, setAudioKey] = useState(0); // Force audio re-render
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const sourcesRef = useRef<SourceResult[]>([]); // Track current sources for cleanup
+
+  // Keep sourcesRef in sync with sources state
+  React.useEffect(() => {
+    sourcesRef.current = sources;
+  }, [sources]);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      // Clean up previous audio URLs before setting new file
+      cleanupAudioUrls();
+      
       setSelectedFile(file);
       setError(null);
       setResult(null);
@@ -32,11 +42,33 @@ export const AISourceSeparation: React.FC = () => {
     }
   };
 
+  // Helper function to clean up blob URLs
+  const cleanupAudioUrls = () => {
+    // Use ref to get current sources, avoiding stale closure
+    sourcesRef.current.forEach(source => {
+      if (source.audioUrl) {
+        try {
+          URL.revokeObjectURL(source.audioUrl);
+          console.log(`Revoked URL for ${source.name}`);
+        } catch (error) {
+          console.warn(`Failed to revoke URL for ${source.name}:`, error);
+        }
+      }
+    });
+  };
+
   const processAudio = async (file: File) => {
+    // Clean up previous audio URLs FIRST before any state changes
+    cleanupAudioUrls();
+    
+    // Clear sources and increment key to force unmount
+    setSources([]);
+    setAudioKey(prev => prev + 1);
+    
+    // Now set processing state
     setIsProcessing(true);
     setError(null);
     setResult(null);
-    setSources([]);
 
     try {
       console.log('Uploading and processing audio...');
@@ -116,11 +148,15 @@ export const AISourceSeparation: React.FC = () => {
   };
 
   const handleProcessSample = async () => {
+    // Clean up and reset state FIRST before any processing
+    cleanupAudioUrls();
+    setSources([]);
+    setAudioKey(prev => prev + 1);
+    
+    // Now set processing state
     setIsProcessing(true);
     setError(null);
     setResult(null);
-    setSources([]);
-    setSelectedFile(null);
 
     try {
       console.log('Processing sample audio...');
@@ -289,7 +325,13 @@ export const AISourceSeparation: React.FC = () => {
                 )}
                 
                 {/* Audio Player */}
-                <audio controls src={source.audioUrl} className="audio-player">
+                <audio 
+                  key={`${source.name}-${audioKey}`} // Use consistent key for re-rendering
+                  controls 
+                  src={source.audioUrl} 
+                  className="audio-player"
+                  preload="none" // Prevent automatic loading of old cached data
+                >
                   Your browser does not support the audio element.
                 </audio>
               </div>
