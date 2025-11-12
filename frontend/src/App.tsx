@@ -234,12 +234,34 @@ function App() {
     const playback = playbackRef.current;
     playback.initialize();
 
-    // Subscribe to playback time updates
+    // Subscribe to playback time updates and reset when the buffer finishes
     const unsubscribe = playback.subscribe((currentTime) => {
-      setPlaybackState(prev => ({
-        ...prev,
-        currentTime: Math.min(currentTime, prev.duration),
-      }));
+      setPlaybackState(prev => {
+        const duration = prev.duration || 0;
+        const reachedEnd = duration > 0 && currentTime >= duration;
+
+        if (reachedEnd) {
+          if (!prev.isPlaying && prev.currentTime === 0) {
+            return prev;
+          }
+
+          return {
+            ...prev,
+            isPlaying: false,
+            currentTime: 0,
+          };
+        }
+
+        const clampedTime = duration > 0 ? Math.min(currentTime, duration) : currentTime;
+        if (clampedTime === prev.currentTime) {
+          return prev;
+        }
+
+        return {
+          ...prev,
+          currentTime: clampedTime,
+        };
+      });
     });
 
     return () => {
