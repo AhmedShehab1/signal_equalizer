@@ -8,7 +8,7 @@ from torchaudio. It separates audio into drums, bass, vocals, and other.
 import io
 import base64
 from pathlib import Path
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional
 import logging
 
 import torch
@@ -65,6 +65,7 @@ class DemucsService:
             Separated sources tensor [batch, sources, channels, length]
         """
         batch, channels, length = mix.shape
+        total_duration = length / self.sample_rate
         
         chunk_len = int(self.sample_rate * segment * (1 + overlap))
         start = 0
@@ -74,8 +75,25 @@ class DemucsService:
         
         final = torch.zeros(batch, len(self.model.sources), channels, length, device=self.device)
         
+        # Calculate total chunks for progress
+        total_chunks = 0
+        temp_start = 0
+        while temp_start < length - overlap_frames:
+            total_chunks += 1
+            if temp_start == 0:
+                temp_start += int(chunk_len - overlap_frames)
+            else:
+                temp_start += chunk_len
+        
+        logger.info(f"Processing {total_duration:.1f}s audio in {total_chunks} chunks of {segment}s each")
+        
+        chunk_num = 0
         while start < length - overlap_frames:
+            chunk_num += 1
             chunk = mix[:, :, start:end]
+            
+            logger.info(f"Processing chunk {chunk_num}/{total_chunks} ({chunk_num/total_chunks*100:.1f}%)")
+            
             with torch.no_grad():
                 out = self.model.forward(chunk)
             out = fade(out)
@@ -91,6 +109,7 @@ class DemucsService:
             if end >= length:
                 fade.fade_out_len = 0
         
+        logger.info("Source separation completed!")
         return final
     
     def generate_spectrogram_image(self, audio: torch.Tensor, title: str = "Spectrogram") -> str:
@@ -104,42 +123,81 @@ class DemucsService:
         Returns:
             Base64 encoded PNG image
         """
-        # Compute spectrogram
-        stft_result = self.stft(audio)
-        magnitude = stft_result.abs()
-        spectrogram = 20 * torch.log10(magnitude + 1e-8).cpu().numpy()
-        
-        # Create figure
-        fig, axis = plt.subplots(1, 1, figsize=(10, 4))
-        im = axis.imshow(
-            spectrogram[0],  # Take first channel
-            cmap="viridis",
-            vmin=-60,
-            vmax=0,
-            origin="lower",
-            aspect="auto"
-        )
-        axis.set_title(title)
-        axis.set_xlabel("Time")
-        axis.set_ylabel("Frequency")
-        plt.colorbar(im, ax=axis, label="Magnitude (dB)")
-        plt.tight_layout()
-        
-        # Convert to base64
-        buffer = io.BytesIO()
-        plt.savefig(buffer, format='png', dpi=100, bbox_inches='tight')
-        plt.close(fig)
-        buffer.seek(0)
-        image_base64 = base64.b64encode(buffer.read()).decode('utf-8')
-        
-        return f"data:image/png;base64,{image_base64}"
+        try:
+            # Downsample long audio for spectrogram generation to prevent hanging
+            max_duration = 30.0  # Limit to 30 seconds for spectrogram
+            if audio.shape[1] > max_duration * self.sample_rate:
+                logger.info(f"Downsampling audio from {audio.shape[1]/self.sample_rate:.1f}s to {max_duration:.1f}s for spectrogram")
+                # Take first 30 seconds for spectrogram
+                audio = audio[:, :int(max_duration * self.sample_rate)]
+            
+            # Use smaller FFT size for faster computation
+            n_fft_spec = 1024  # Reduced from 4096
+            hop_length_spec = n_fft_spec // 4
+            
+            # Create spectrogram transform with optimized parameters
+            stft_transform = torchaudio.transforms.Spectrogram(
+                n_fft=n_fft_spec,
+                hop_length=hop_length_spec,
+                power=None,
+            )
+            
+            # Compute spectrogram with optimized parameters
+            stft_result = stft_transform(audio)
+            magnitude = stft_result.abs()
+            spectrogram = 20 * torch.log10(magnitude + 1e-8).cpu().numpy()
+            
+            # Create figure with optimized size for web display
+            fig, axis = plt.subplots(1, 1, figsize=(6, 2.5))  # Even smaller for performance
+            
+            # Use first channel only and downsample frequency bins for display
+            spec_data = spectrogram[0]  # Take first channel
+            
+            # Downsample frequency bins if too large (every 2nd bin)
+            if spec_data.shape[0] > 512:
+                spec_data = spec_data[::2, :]
+            
+            im = axis.imshow(
+                spec_data,
+                cmap="viridis",
+                vmin=-60,
+                vmax=0,
+                origin="lower",
+                aspect="auto"
+            )
+            axis.set_title(title, fontsize=9)  # Even smaller font
+            axis.set_xlabel("Time", fontsize=7)
+            axis.set_ylabel("Frequency", fontsize=7)
+            
+            # Remove tick labels for faster rendering
+            axis.set_xticks([])
+            axis.set_yticks([])
+            
+            plt.tight_layout(pad=0.5)  # Tighter layout
+            
+            # Convert to base64 with very low DPI for web display
+            buffer = io.BytesIO()
+            plt.savefig(buffer, format='png', dpi=60, bbox_inches='tight')  # Very low DPI
+            plt.close(fig)  # Important: close figure to free memory
+            buffer.seek(0)
+            
+            image_base64 = base64.b64encode(buffer.read()).decode('utf-8')
+            
+            return f"data:image/png;base64,{image_base64}"
+            
+        except Exception as e:
+            logger.error(f"Error generating spectrogram: {e}")
+            # Close any open figures to prevent memory leaks
+            plt.close('all')
+            raise e
     
     def process_audio_file(
         self,
         audio_bytes: bytes,
         segment: float = 10.0,
         overlap: float = 0.1,
-        generate_spectrograms: bool = True
+        generate_spectrograms: bool = True,
+        max_duration: Optional[float] = None
     ) -> Dict:
         """
         Process an audio file and separate it into sources.
@@ -149,6 +207,7 @@ class DemucsService:
             segment: Segment length in seconds for processing
             overlap: Overlap ratio between segments
             generate_spectrograms: Whether to generate spectrogram images
+            max_duration: Maximum duration in seconds (truncates if longer)
             
         Returns:
             Dictionary containing separated audio and spectrograms
@@ -169,6 +228,14 @@ class DemucsService:
             waveform = resampler(waveform)
         
         waveform = waveform.to(self.device)
+        
+        # Truncate audio if max_duration is specified
+        if max_duration is not None:
+            max_frames = int(max_duration * self.sample_rate)
+            if waveform.shape[1] > max_frames:
+                logger.info(f"Truncating audio from {waveform.shape[1]/self.sample_rate:.1f}s to {max_duration:.1f}s")
+                waveform = waveform[:, :max_frames]
+        
         mixture = waveform
         
         # Normalize
@@ -196,8 +263,11 @@ class DemucsService:
             "sources": {}
         }
         
+        logger.info(f"Converting audio data (generate_spectrograms={generate_spectrograms})...")
+        
         # Convert each source to numpy array and optionally generate spectrograms
         for idx, source_name in enumerate(self.model.sources):
+            logger.info(f"Processing source: {source_name}")
             source_audio = sources_cpu[idx]
             
             # Convert to numpy for audio data
@@ -210,21 +280,35 @@ class DemucsService:
             
             if generate_spectrograms:
                 logger.info(f"Generating spectrogram for {source_name}...")
-                spectrogram = self.generate_spectrogram_image(
-                    source_audio,
-                    title=f"Spectrogram - {source_name.capitalize()}"
-                )
-                result["sources"][source_name]["spectrogram"] = spectrogram
+                try:
+                    spectrogram = self.generate_spectrogram_image(
+                        source_audio,
+                        title=f"Spectrogram - {source_name.capitalize()}"
+                    )
+                    result["sources"][source_name]["spectrogram"] = spectrogram
+                    logger.info(f"Spectrogram for {source_name} completed")
+                except Exception as e:
+                    logger.error(f"Failed to generate spectrogram for {source_name}: {e}")
+                    # Continue without spectrogram for this source
+            else:
+                logger.info(f"Skipping spectrogram for {source_name} (generate_spectrograms=False)")
         
         # Generate mixture spectrogram
         if generate_spectrograms:
             logger.info("Generating mixture spectrogram...")
-            result["mixture_spectrogram"] = self.generate_spectrogram_image(
-                mixture_cpu,
-                title="Spectrogram - Original Mixture"
-            )
+            try:
+                result["mixture_spectrogram"] = self.generate_spectrogram_image(
+                    mixture_cpu,
+                    title="Spectrogram - Original Mixture"
+                )
+                logger.info("Mixture spectrogram completed")
+            except Exception as e:
+                logger.error(f"Failed to generate mixture spectrogram: {e}")
+                # Continue without mixture spectrogram
+        else:
+            logger.info("Skipping mixture spectrogram (generate_spectrograms=False)")
         
-        logger.info("Processing complete!")
+        logger.info("All processing complete!")
         return result
     
     def load_sample_audio(self, sample_path: Path) -> bytes:

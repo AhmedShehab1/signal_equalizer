@@ -106,16 +106,16 @@ async def api_info():
 
 
 @app.post("/api/audio/separate")
-async def separate_audio(
+async def separate_audio_file(
     file: UploadFile = File(...),
     segment: float = 10.0,
     overlap: float = 0.1
 ):
     """
-    Separate uploaded audio file into drums, bass, vocals, and other using Hybrid Demucs.
+    Upload and separate an audio file into sources.
     
     Args:
-        file: Audio file (WAV, MP3, FLAC, OGG)
+        file: Audio file to process
         segment: Segment length in seconds for processing (default: 10.0)
         overlap: Overlap ratio between segments (default: 0.1)
         
@@ -159,25 +159,26 @@ async def separate_audio(
 
 
 @app.get("/api/audio/sample")
-async def process_sample_audio(
-    segment: float = 10.0,
-    overlap: float = 0.1
+async def process_demo_sample(
+    segment: float = 5.0,
+    overlap: float = 0.1,
+    spectrograms: bool = True
 ):
     """
-    Process a sample audio file for demo purposes.
+    Process the built-in demo sample audio for demonstration purposes.
     
     Args:
-        segment: Segment length in seconds for processing (default: 10.0)
+        segment: Segment length in seconds for processing (default: 5.0)
         overlap: Overlap ratio between segments (default: 0.1)
+        spectrograms: Whether to generate spectrograms (default: True)
         
     Returns:
-        JSON with separated sources and spectrograms
+        JSON with separated sources and optionally spectrograms
     """
-    logger.info("Processing sample audio for demo")
+    logger.info(f"Processing demo sample audio (spectrograms: {spectrograms})")
     
     try:
-        # Try to load sample from torchaudio assets
-        
+        # Load sample audio
         sample_path = fetch_sample_audio()
         
         # Read sample file
@@ -187,20 +188,21 @@ async def process_sample_audio(
         # Get Demucs service and process
         demucs_service = get_demucs_service()
         result = demucs_service.process_audio_file(
-            audio_bytes=audio_bytes,
+            audio_bytes,
             segment=segment,
             overlap=overlap,
-            generate_spectrograms=True
+            generate_spectrograms=spectrograms,
+            max_duration=10.0  # Limit to 10 seconds for faster demo
         )
         
-        logger.info("Sample audio separation completed successfully")
+        logger.info("Demo sample processing completed successfully")
         return JSONResponse(content=result)
         
     except Exception as e:
-        logger.error(f"Error processing sample audio: {str(e)}", exc_info=True)
+        logger.error(f"Error processing demo sample: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Error processing sample audio: {str(e)}"
+            detail=f"Error processing demo sample: {str(e)}"
         )
 
 
@@ -236,4 +238,6 @@ if __name__ == "__main__":
         log_level="info",
         timeout_keep_alive=300,  # 5 minutes keep-alive
         timeout_graceful_shutdown=30,
+        # Additional settings for long-running AI processing
+        backlog=2048,
     )
