@@ -7,6 +7,10 @@
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
+// ============================================================================
+// Type Definitions
+// ============================================================================
+
 export interface SeparatedSource {
   audio_shape: number[];
   audio_data: number[][];
@@ -24,14 +28,39 @@ export interface SeparationResult {
   mixture_spectrogram?: string; // Base64 encoded image
 }
 
+/**
+ * Speech separation source with generic naming (Source 0, Source 1, etc.)
+ */
+export interface SpeechSource {
+  audio_shape: number[];
+  audio_data: number[];
+  spectrogram?: string; // Base64 encoded image
+}
+
+/**
+ * Speech separation result with variable number of sources
+ */
+export interface SpeechSeparationResult {
+  sample_rate: number;
+  num_sources: number;
+  sources: {
+    [key: string]: SpeechSource; // source_0, source_1, source_2, etc.
+  };
+  mixture_spectrogram?: string; // Base64 encoded image
+}
+
 export interface APIError {
   error: string;
   message: string;
   detail?: string;
 }
 
+// ============================================================================
+// Music Source Separation (Demucs)
+// ============================================================================
+
 /**
- * Upload and separate an audio file
+ * Upload and separate an audio file into music sources (drums, bass, vocals, other)
  */
 export async function separateAudio(
   file: File,
@@ -74,7 +103,7 @@ export async function separateAudio(
 }
 
 /**
- * Process the demo sample audio
+ * Process the demo sample audio with Demucs (music separation)
  */
 export async function processSampleAudio(
   segment: number = 5.0,
@@ -113,6 +142,101 @@ export async function processSampleAudio(
   }
 }
 
+// ============================================================================
+// Speech Source Separation (DPRNN)
+// ============================================================================
+
+/**
+ * Upload and separate speech audio into individual speakers (Source 0, Source 1, etc.)
+ * 
+ * @param file - Audio file to process
+ * @param maxDuration - Maximum duration to process in seconds (default: 8.0, range: 0-30)
+ * @returns Promise with separated speech sources
+ */
+export async function separateSpeechAudio(
+  file: File,
+  maxDuration: number = 8.0
+): Promise<SpeechSeparationResult> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const url = new URL('/api/audio/speech-separate', API_BASE_URL);
+  url.searchParams.append('max_duration', maxDuration.toString());
+
+  // Create AbortController for timeout (2 minutes for speech processing)
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minutes
+
+  try {
+    const response = await fetch(url.toString(), {
+      method: 'POST',
+      body: formData,
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const error: APIError = await response.json();
+      throw new Error(error.detail || error.message || 'Failed to separate speech audio');
+    }
+
+    return response.json();
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Request timed out. Speech processing is taking longer than expected (>2 minutes).');
+    }
+    throw error;
+  }
+}
+
+/**
+ * Process the demo speech sample with DPRNN (speech separation)
+ * 
+ * @param maxDuration - Maximum duration to process in seconds (default: 8.0, range: 0-30)
+ * @param spectrograms - Whether to generate spectrograms (default: true)
+ * @returns Promise with separated speech sources
+ */
+export async function processSpeechSample(
+  maxDuration: number = 8.0,
+  spectrograms: boolean = true
+): Promise<SpeechSeparationResult> {
+  const url = new URL('/api/audio/speech-sample', API_BASE_URL);
+  url.searchParams.append('max_duration', maxDuration.toString());
+  url.searchParams.append('spectrograms', spectrograms.toString());
+
+  // Create AbortController for timeout (1 minute for demo processing)
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 60000); // 1 minute
+
+  try {
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const error: APIError = await response.json();
+      throw new Error(error.detail || error.message || 'Failed to process speech demo sample');
+    }
+
+    return response.json();
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Request timed out. Speech demo processing is taking longer than expected (>1 minute).');
+    }
+    throw error;
+  }
+}
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
 /**
  * Check backend health
  */
@@ -141,10 +265,20 @@ export async function getAPIInfo(): Promise<any> {
 
 /**
  * Convert Float32Array audio data to WAV blob for playback
+ * Handles both music (2D array) and speech (1D array) audio data
+ * 
+ * @param audioData - Audio data as 2D array (music) or 1D array (speech)
+ * @param sampleRate - Sample rate of the audio
+ * @returns WAV blob ready for playback
  */
-export function audioArrayToWav(audioData: number[][], sampleRate: number): Blob {
-  const numChannels = audioData.length;
-  const length = audioData[0].length;
+export function audioArrayToWav(audioData: number[][] | number[], sampleRate: number): Blob {
+  // Normalize input to 2D array format
+  const channels: number[][] = Array.isArray(audioData[0]) 
+    ? audioData as number[][]
+    : [audioData as number[]]; // Convert 1D to 2D with single channel
+  
+  const numChannels = channels.length;
+  const length = channels[0].length;
   
   // Create WAV file buffer
   const buffer = new ArrayBuffer(44 + length * numChannels * 2);
@@ -175,11 +309,52 @@ export function audioArrayToWav(audioData: number[][], sampleRate: number): Blob
   let offset = 44;
   for (let i = 0; i < length; i++) {
     for (let channel = 0; channel < numChannels; channel++) {
-      const sample = Math.max(-1, Math.min(1, audioData[channel][i]));
+      const sample = Math.max(-1, Math.min(1, channels[channel][i]));
       view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
       offset += 2;
     }
   }
   
   return new Blob([buffer], { type: 'audio/wav' });
+}
+
+/**
+ * Get user-friendly label for a source key
+ * 
+ * @param sourceKey - Source key (e.g., "drums", "source_0")
+ * @returns User-friendly label (e.g., "Drums", "Source 1")
+ */
+export function getSourceLabel(sourceKey: string): string {
+  // Speech sources: source_0, source_1, etc.
+  if (sourceKey.startsWith('source_')) {
+    const index = parseInt(sourceKey.split('_')[1]);
+    return `Source ${index + 1}`; // Convert 0-indexed to 1-indexed for display
+  }
+  
+  // Music sources: drums, bass, vocals, other
+  return sourceKey.charAt(0).toUpperCase() + sourceKey.slice(1);
+}
+
+/**
+ * Check if a separation result is from speech separation (DPRNN)
+ * 
+ * @param result - Separation result (music or speech)
+ * @returns true if speech separation, false if music separation
+ */
+export function isSpeechSeparation(
+  result: SeparationResult | SpeechSeparationResult
+): result is SpeechSeparationResult {
+  return 'num_sources' in result;
+}
+
+/**
+ * Get all source keys from a separation result
+ * 
+ * @param result - Separation result (music or speech)
+ * @returns Array of source keys
+ */
+export function getSourceKeys(
+  result: SeparationResult | SpeechSeparationResult
+): string[] {
+  return Object.keys(result.sources);
 }
