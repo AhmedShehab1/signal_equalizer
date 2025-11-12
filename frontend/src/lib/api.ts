@@ -77,16 +77,18 @@ export async function separateAudio(
  * Process the demo sample audio
  */
 export async function processSampleAudio(
-  segment: number = 10.0,
-  overlap: number = 0.1
+  segment: number = 5.0,
+  overlap: number = 0.1,
+  spectrograms: boolean = true
 ): Promise<SeparationResult> {
   const url = new URL('/api/audio/sample', API_BASE_URL);
   url.searchParams.append('segment', segment.toString());
   url.searchParams.append('overlap', overlap.toString());
+  url.searchParams.append('spectrograms', spectrograms.toString());
 
-  // Create AbortController for timeout (5 minutes for AI processing)
+  // Create AbortController for timeout (3 minutes for demo processing)
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutes
+  const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 minutes
 
   try {
     const response = await fetch(url.toString(), {
@@ -98,14 +100,14 @@ export async function processSampleAudio(
 
     if (!response.ok) {
       const error: APIError = await response.json();
-      throw new Error(error.detail || error.message || 'Failed to process sample audio');
+      throw new Error(error.detail || error.message || 'Failed to process demo sample');
     }
 
     return response.json();
   } catch (error) {
     clearTimeout(timeoutId);
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('Request timed out. AI processing is taking longer than expected (>5 minutes).');
+      throw new Error('Request timed out. Demo processing is taking longer than expected (>3 minutes).');
     }
     throw error;
   }
