@@ -11,6 +11,7 @@ import Controls from './components/Controls';
 import ModeSelector from './components/ModeSelector';
 import GenericMode, { GenericBand, genericBandsToBandSpecs } from './components/GenericMode';
 import CustomizedModePanel from './components/CustomizedModePanel';
+import { AISourceSeparation } from './components/AISourceSeparation';
 import { AudioPlayback } from './lib/playback';
 import { stftFrames, istft } from './lib/stft';
 import { Complex } from './lib/fft';
@@ -18,7 +19,7 @@ import { generateSpectrogram, buildGainVector } from './lib/spectrogram';
 import { FrequencyBand, EqualizerMode, PlaybackState, SpectrogramData, BandSpec, STFTOptions } from './model/types';
 import './App.css';
 
-type AppMode = 'preset' | 'generic' | 'custom';
+type AppMode = 'preset' | 'generic' | 'custom' | 'ai-separation';
 
 function App() {
   // Audio buffers: original (immutable) and processed (EQ output)
@@ -378,6 +379,16 @@ function App() {
     <div className="app">
       <h1>Signal Equalizer</h1>
       
+      {/* Quick access to AI separation - always visible */}
+      <div className="quick-access">
+        <button
+          className="btn-ai-quick"
+          onClick={() => handleModeSwitch('ai-separation')}
+        >
+          🎵 Try AI Source Separation (No file needed!)
+        </button>
+      </div>
+      
       <FileLoader onFileLoad={handleFileLoad} />
       
       {fileName && <p>Loaded: {fileName}</p>}
@@ -406,6 +417,13 @@ function App() {
           >
             Customized Modes
           </button>
+          <button
+            className={appMode === 'ai-separation' ? 'active' : ''}
+            onClick={() => handleModeSwitch('ai-separation')}
+            disabled={isProcessing}
+          >
+            AI Source Separation
+          </button>
         </div>
       )}
 
@@ -422,7 +440,12 @@ function App() {
         </div>
       )}
 
-      {originalBuffer && (
+      {/* AI Source Separation - works without loading a file */}
+      {appMode === 'ai-separation' && (
+        <AISourceSeparation />
+      )}
+
+      {originalBuffer && appMode !== 'ai-separation' && (
         <>
           <Controls
             playbackState={playbackState}
@@ -455,12 +478,12 @@ function App() {
               sampleRate={originalBuffer.sampleRate}
               disabled={isProcessing}
             />
-          ) : (
+          ) : appMode === 'custom' ? (
             <CustomizedModePanel
               onBandSpecsChange={handleCustomModeBandSpecsChange}
               disabled={isProcessing}
             />
-          )}
+          ) : null}
 
           <LinkedWaveformViewers
             inputBuffer={originalBuffer}

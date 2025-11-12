@@ -1,5 +1,5 @@
 .app {
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 2rem;
 }
@@ -8,6 +8,29 @@ h1 {
   text-align: center;
   color: #646cff;
   margin-bottom: 2rem;
+}
+
+.quick-access {
+  text-align: center;
+  margin: 1.5rem 0;
+}
+
+.btn-ai-quick {
+  padding: 1rem 2rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.btn-ai-quick:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
 }
 
 .file-loader {
@@ -674,4 +697,219 @@ input[type="range"]:disabled {
 
 .waveform-viewer canvas:active {
   cursor: grabbing;
+}
+
+/* AI Source Separation Styles */
+.ai-source-separation {
+  padding: 2rem;
+}
+
+.ai-source-separation h2 {
+  color: #646cff;
+  margin-bottom: 1rem;
+}
+
+.ai-source-separation .description {
+  color: #888;
+  margin-bottom: 2rem;
+  line-height: 1.6;
+}
+
+.upload-section {
+  background: #1a1a1a;
+  padding: 2rem;
+  border-radius: 8px;
+  margin-bottom: 2rem;
+}
+
+.upload-controls {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.upload-controls input[type="file"] {
+  flex: 1;
+  min-width: 200px;
+  padding: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #444;
+  background: #2a2a2a;
+  color: white;
+}
+
+.upload-controls button {
+  padding: 0.75rem 1.5rem;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.upload-controls .btn-primary {
+  background: #646cff;
+  color: white;
+}
+
+.upload-controls .btn-primary:hover:not(:disabled) {
+  background: #535bf2;
+}
+
+.upload-controls .btn-secondary {
+  background: #444;
+  color: white;
+}
+
+.upload-controls .btn-secondary:hover:not(:disabled) {
+  background: #555;
+}
+
+.upload-controls button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.selected-file {
+  color: #888;
+  margin-top: 1rem;
+  font-style: italic;
+}
+
+.processing-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 2rem;
+  background: #1a1a1a;
+  border-radius: 8px;
+  margin-bottom: 2rem;
+}
+
+.processing-info {
+  text-align: center;
+  max-width: 600px;
+}
+
+.processing-info p {
+  margin: 0.5rem 0;
+  color: #ccc;
+  line-height: 1.5;
+}
+
+.processing-info p:first-child {
+  font-size: 1.1rem;
+  color: #646cff;
+  margin-bottom: 1rem;
+}
+
+.processing-indicator .processing-note {
+  font-size: 0.9rem;
+  color: #888;
+  text-align: center;
+  line-height: 1.4;
+  margin-top: 0.5rem;
+}
+
+.spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #444;
+  border-top-color: #646cff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.error-message {
+  background: #ff4444;
+  color: white;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 2rem;
+}
+
+.results {
+  margin-top: 2rem;
+}
+
+.results h3 {
+  color: #646cff;
+  margin-bottom: 1.5rem;
+  font-size: 1.5rem;
+}
+
+.spectrogram-section {
+  background: #1a1a1a;
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 2rem;
+}
+
+.spectrogram-section h4 {
+  color: #888;
+  margin-bottom: 1rem;
+  font-size: 1.1rem;
+}
+
+.spectrogram-image {
+  width: 100%;
+  height: auto;
+  border-radius: 4px;
+  background: white;
+  padding: 0.5rem;
+}
+
+.sources-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+  margin-top: 2rem;
+}
+
+.source-card {
+  background: #1a1a1a;
+  padding: 1.5rem;
+  border-radius: 8px;
+  border: 2px solid #444;
+  transition: border-color 0.2s;
+}
+
+.source-card:hover {
+  border-color: #646cff;
+}
+
+.source-card h4 {
+  color: #646cff;
+  margin-bottom: 1rem;
+  font-size: 1.2rem;
+  text-transform: capitalize;
+}
+
+.audio-player {
+  width: 100%;
+  margin-top: 1rem;
+  border-radius: 4px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .upload-controls {
+    flex-direction: column;
+  }
+  
+  .upload-controls input[type="file"],
+  .upload-controls button {
+    width: 100%;
+  }
+  
+  .sources-grid {
+    grid-template-columns: 1fr;
+  }
 }
