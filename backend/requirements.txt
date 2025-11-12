@@ -14,6 +14,10 @@ torch==2.1.1
 torchaudio==2.1.1
 mir-eval==0.7
 
+# Speech Separation (DPRNN)
+asteroid>=0.7.0
+pytorch-lightning>=2.0.0
+
 # Image Processing for Spectrograms
 matplotlib==3.8.2
 Pillow==10.1.0
