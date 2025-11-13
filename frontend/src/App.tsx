@@ -17,9 +17,19 @@ import { stftFrames, istft } from './lib/stft';
 import { Complex } from './lib/fft';
 import { generateSpectrogram, buildGainVector } from './lib/spectrogram';
 import { FrequencyBand, EqualizerMode, PlaybackState, SpectrogramData, BandSpec, STFTOptions } from './model/types';
+import { SpeechSeparationResult } from './lib/api';
 import './App.css';
 
 type AppMode = 'preset' | 'generic' | 'custom' | 'ai-separation';
+
+// AI separation cache for session persistence
+interface AISeparationCache {
+  speechResult: SpeechSeparationResult | null;
+  sourceGains: Map<string, number>;
+  sourceBuffers: Map<string, AudioBuffer>;
+  timestamp: number;
+  fileName: string;
+}
 
 function App() {
   // Audio buffers: original (immutable) and processed (EQ output)
@@ -41,6 +51,12 @@ function App() {
   
   // Customized mode state (slider scales for current mode)
   const [customModeBandSpecs, setCustomModeBandSpecs] = useState<BandSpec[]>([]);
+  
+  // AI separation cache - persists across tab switches
+  const [aiSeparationCache, setAISeparationCache] = useState<AISeparationCache | null>(null);
+  
+  // Customized mode sub-tab state (dsp or ai)
+  const [customModeTab, setCustomModeTab] = useState<'dsp' | 'ai'>('dsp');
   
   // Dual spectrograms: input and output
   const [inputSpectrogramData, setInputSpectrogramData] = useState<SpectrogramData | null>(null);
@@ -276,6 +292,11 @@ function App() {
     setProcessedBuffer(null);
     setFileName(name);
     setAudioFile(file); // Store raw file for AI processing
+    
+    // Clear AI separation cache when new file is loaded
+    setAISeparationCache(null);
+    setCustomModeTab('dsp'); // Reset to DSP tab
+    
     setPlaybackState({
       isPlaying: false,
       currentTime: 0,
@@ -368,6 +389,28 @@ function App() {
     setOutputSpectrogramData(spectrogramData);
   };
 
+  // Save AI separation results to cache
+  const handleAICacheUpdate = (
+    speechResult: SpeechSeparationResult | null,
+    sourceGains: Map<string, number>,
+    sourceBuffers: Map<string, AudioBuffer>
+  ) => {
+    if (speechResult && fileName) {
+      setAISeparationCache({
+        speechResult,
+        sourceGains,
+        sourceBuffers,
+        timestamp: Date.now(),
+        fileName,
+      });
+    }
+  };
+
+  // Handle custom mode tab switching
+  const handleCustomModeTabChange = (tab: 'dsp' | 'ai') => {
+    setCustomModeTab(tab);
+  };
+
   const handleModeSwitch = async (mode: AppMode) => {
     setAppMode(mode);
     
@@ -378,6 +421,9 @@ function App() {
       await runRecompute(presetBandsToBandSpecs(bands));
     } else if (mode === 'generic') {
       await runRecompute(genericBandsToBandSpecs(genericBands));
+    } else if (mode === 'custom') {
+      // Custom mode: don't recompute automatically
+      // Let the user control DSP/AI processing
     } else if (customModeBandSpecs.length > 0) {
       // Only recompute if custom mode has loaded specs
       await runRecompute(customModeBandSpecs);
@@ -512,6 +558,10 @@ function App() {
               disabled={isProcessing}
               audioFile={audioFile}
               onAudioMixed={handleAIMixedAudio}
+              aiCache={aiSeparationCache}
+              onAICacheUpdate={handleAICacheUpdate}
+              activeTab={customModeTab}
+              onTabChange={handleCustomModeTabChange}
             />
           ) : null}
 

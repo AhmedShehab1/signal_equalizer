@@ -732,6 +732,25 @@ input[type="range"]:disabled {
   font-size: 0.85rem;
 }
 
+.cache-info {
+  margin: 0;
+  padding: 8px 12px;
+  background: rgba(100, 200, 255, 0.1);
+  border: 1px solid rgba(100, 200, 255, 0.3);
+  border-radius: 4px;
+  color: #64c8ff;
+  font-size: 0.85rem;
+}
+
+.cache-timestamp {
+  margin: 0;
+  padding: 4px 8px;
+  color: #888;
+  font-size: 0.75rem;
+  font-style: italic;
+  text-align: center;
+}
+
 /* Source Controls */
 .source-controls {
   margin-top: 24px;

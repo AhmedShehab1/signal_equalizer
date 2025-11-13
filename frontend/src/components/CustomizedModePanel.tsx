@@ -11,16 +11,42 @@ import { separateSpeechAudio, getSourceLabel, type SpeechSeparationResult } from
 
 type ProcessingMode = 'dsp' | 'ai';
 
+// AI separation cache structure
+interface AISeparationCache {
+  speechResult: SpeechSeparationResult | null;
+  sourceGains: Map<string, number>;
+  sourceBuffers: Map<string, AudioBuffer>;
+  timestamp: number;
+  fileName: string;
+}
+
 interface CustomizedModePanelProps {
   onBandSpecsChange: (bandSpecs: BandSpec[]) => void;
   disabled?: boolean;
   audioFile?: File | null;
-  onAudioMixed?: (mixedBuffer: AudioBuffer) => void; // Callback for AI mixed audio
+  onAudioMixed?: (mixedBuffer: AudioBuffer) => void;
+  aiCache?: AISeparationCache | null;
+  onAICacheUpdate?: (
+    speechResult: SpeechSeparationResult | null,
+    sourceGains: Map<string, number>,
+    sourceBuffers: Map<string, AudioBuffer>
+  ) => void;
+  activeTab?: 'dsp' | 'ai';
+  onTabChange?: (tab: 'dsp' | 'ai') => void;
 }
 
-export default function CustomizedModePanel({ onBandSpecsChange, disabled = false, audioFile = null, onAudioMixed }: CustomizedModePanelProps) {
-  // Processing mode state
-  const [processingMode, setProcessingMode] = useState<ProcessingMode>('dsp');
+export default function CustomizedModePanel({ 
+  onBandSpecsChange, 
+  disabled = false, 
+  audioFile = null, 
+  onAudioMixed,
+  aiCache = null,
+  onAICacheUpdate,
+  activeTab = 'dsp',
+  onTabChange
+}: CustomizedModePanelProps) {
+  // Processing mode state - controlled by parent or local
+  const [processingMode, setProcessingMode] = useState<ProcessingMode>(activeTab);
   
   // DSP mode state (existing)
   const [currentMode, setCurrentMode] = useState<CustomizedMode | null>(null);
@@ -40,6 +66,23 @@ export default function CustomizedModePanel({ onBandSpecsChange, disabled = fals
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Sync processing mode with parent activeTab prop
+  useEffect(() => {
+    if (activeTab !== processingMode) {
+      setProcessingMode(activeTab);
+    }
+  }, [activeTab]);
+
+  // Restore from cache when switching back to AI mode
+  useEffect(() => {
+    if (processingMode === 'ai' && aiCache && !speechResult) {
+      // Restore cached results
+      setSpeechResult(aiCache.speechResult);
+      setSourceGains(aiCache.sourceGains);
+      setSourceBuffers(aiCache.sourceBuffers);
+    }
+  }, [processingMode, aiCache]);
+
   // Mode switching handler - ensures mutual exclusivity
   const handleModeSwitch = (newMode: ProcessingMode) => {
     if (newMode === processingMode) return;
@@ -47,10 +90,16 @@ export default function CustomizedModePanel({ onBandSpecsChange, disabled = fals
     setProcessingMode(newMode);
     setError(null);
     
+    // Notify parent of tab change
+    if (onTabChange) {
+      onTabChange(newMode);
+    }
+    
     if (newMode === 'dsp') {
-      // Clear AI state when switching to DSP
+      // Clear AI state when switching to DSP (don't clear cache)
       setSpeechResult(null);
       setSourceGains(new Map());
+      setSourceBuffers(new Map());
       setAiProcessing(false);
     } else {
       // Clear DSP state when switching to AI
@@ -89,6 +138,11 @@ export default function CustomizedModePanel({ onBandSpecsChange, disabled = fals
         const mixed = mixSources(buffers, initialGains);
         onAudioMixed(mixed);
       }
+      
+      // Save to cache via parent callback
+      if (onAICacheUpdate) {
+        onAICacheUpdate(result, initialGains, buffers);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to process audio');
       setSpeechResult(null);
@@ -102,6 +156,12 @@ export default function CustomizedModePanel({ onBandSpecsChange, disabled = fals
     setSourceGains(prev => {
       const updated = new Map(prev);
       updated.set(sourceKey, gain);
+      
+      // Update cache with new gains
+      if (onAICacheUpdate && speechResult && sourceBuffers.size > 0) {
+        onAICacheUpdate(speechResult, updated, sourceBuffers);
+      }
+      
       return updated;
     });
     
@@ -401,10 +461,21 @@ export default function CustomizedModePanel({ onBandSpecsChange, disabled = fals
               disabled={!audioFile || aiProcessing || disabled}
               className="process-button"
             >
-              {aiProcessing ? 'Processing...' : 'Separate Sources'}
+              {aiProcessing ? 'Processing...' : (speechResult ? 'Re-separate Sources' : 'Separate Sources')}
             </button>
             {!audioFile && (
               <p className="info-message">Please select an audio file first</p>
+            )}
+            {aiCache && !speechResult && (
+              <p className="cache-info">
+                ℹ️ Previous results available from {new Date(aiCache.timestamp).toLocaleTimeString()}
+                {' - '}restored automatically
+              </p>
+            )}
+            {speechResult && aiCache && aiCache.timestamp && (
+              <p className="cache-timestamp">
+                Last processed: {new Date(aiCache.timestamp).toLocaleTimeString()}
+              </p>
             )}
           </div>
 
