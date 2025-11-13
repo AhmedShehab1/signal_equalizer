@@ -1,11 +1,15 @@
 /**
  * Unit tests for mixSources audio mixing logic
  * Tests mute/solo behavior and gain application
+ * 
+ * IMPORTANT: These tests use the ACTUAL production code from audioMixer.ts
+ * to ensure test-production parity and catch regressions immediately.
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
+import { mixSources } from '../lib/audioMixer';
 
-// Mock AudioContext and AudioBuffer
+// Mock AudioContext and AudioBuffer for testing
 class MockAudioContext {
   createBuffer(channels: number, length: number, sampleRate: number) {
     return new MockAudioBuffer(channels, length, sampleRate);
@@ -16,18 +20,41 @@ class MockAudioBuffer {
   numberOfChannels: number;
   length: number;
   sampleRate: number;
+  duration: number;
   private channels: Float32Array[];
 
   constructor(channels: number, length: number, sampleRate: number) {
     this.numberOfChannels = channels;
     this.length = length;
     this.sampleRate = sampleRate;
+    this.duration = length / sampleRate;
     this.channels = Array.from({ length: channels }, () => new Float32Array(length));
   }
 
   getChannelData(channel: number): Float32Array {
     return this.channels[channel];
   }
+
+  copyFromChannel(_destination: Float32Array, _channelNumber: number, _bufferOffset?: number): void {
+    throw new Error('copyFromChannel not implemented in mock');
+  }
+
+  copyToChannel(_source: Float32Array, _channelNumber: number, _bufferOffset?: number): void {
+    throw new Error('copyToChannel not implemented in mock');
+  }
+}
+
+// Helper wrapper to call production mixSources with type casting for mocks
+function callMixSources(
+  buffers: Record<string, MockAudioBuffer>,
+  gains: Record<string, number>,
+  audioContext: MockAudioContext
+): MockAudioBuffer {
+  return mixSources(
+    buffers as unknown as Record<string, AudioBuffer>,
+    gains,
+    audioContext as unknown as AudioContext
+  ) as unknown as MockAudioBuffer;
 }
 
 // Helper to create test audio buffer with sine wave
@@ -47,61 +74,6 @@ function createTestBuffer(
   return buffer;
 }
 
-// Implementation of mixSources for testing
-function mixSources(
-  buffers: Record<string, MockAudioBuffer>,
-  gains: Record<string, number>,
-  audioContext: MockAudioContext
-): MockAudioBuffer {
-  const bufferKeys = Object.keys(buffers);
-  if (bufferKeys.length === 0) {
-    throw new Error('No source buffers to mix');
-  }
-  
-  // Filter to only unmuted sources (gain > 0)
-  const activeSources = bufferKeys.filter(key => (gains[key] ?? 1.0) > 0);
-  
-  // Handle edge case: all sources muted
-  if (activeSources.length === 0) {
-    const firstBuffer = buffers[bufferKeys[0]];
-    return audioContext.createBuffer(1, firstBuffer.length, firstBuffer.sampleRate);
-  }
-  
-  // Get first active buffer to determine size and sample rate
-  const firstBuffer = buffers[activeSources[0]];
-  const length = firstBuffer.length;
-  const sampleRate = firstBuffer.sampleRate;
-  
-  // Create output buffer (mono)
-  const mixedBuffer = audioContext.createBuffer(1, length, sampleRate);
-  const mixedData = mixedBuffer.getChannelData(0);
-  
-  // Mix only active (unmuted) sources
-  for (const sourceKey of activeSources) {
-    const buffer = buffers[sourceKey];
-    const gain = gains[sourceKey] ?? 1.0;
-    const sourceData = buffer.getChannelData(0);
-    
-    for (let i = 0; i < length; i++) {
-      mixedData[i] += sourceData[i] * gain;
-    }
-  }
-  
-  // Normalize to prevent clipping
-  let maxVal = 0;
-  for (let i = 0; i < length; i++) {
-    maxVal = Math.max(maxVal, Math.abs(mixedData[i]));
-  }
-  if (maxVal > 1.0) {
-    const normFactor = 1.0 / maxVal;
-    for (let i = 0; i < length; i++) {
-      mixedData[i] *= normFactor;
-    }
-  }
-  
-  return mixedBuffer;
-}
-
 describe('mixSources - Mute/Solo Audio Mixing', () => {
   let audioContext: MockAudioContext;
   const sampleLength = 1000;
@@ -118,7 +90,11 @@ describe('mixSources - Mute/Solo Audio Mixing', () => {
       };
       const gains = { source1: 1.0, source2: 1.0 };
 
-      const mixed = mixSources(buffers, gains, audioContext);
+      const mixed = mixSources(
+        buffers as Record<string, AudioBuffer>,
+        gains,
+        audioContext as unknown as AudioContext
+      );
       const data = mixed.getChannelData(0);
 
       // Verify output exists and has data
@@ -132,7 +108,11 @@ describe('mixSources - Mute/Solo Audio Mixing', () => {
       };
       const gains = { source1: 2.0 };
 
-      const mixed = mixSources(buffers, gains, audioContext);
+      const mixed = mixSources(
+        buffers as Record<string, AudioBuffer>,
+        gains,
+        audioContext as unknown as AudioContext
+      );
       const data = mixed.getChannelData(0);
 
       // With gain 2.0, peak should approach 0.6 (0.3 * 2.0)
@@ -150,7 +130,7 @@ describe('mixSources - Mute/Solo Audio Mixing', () => {
       };
       const gains = { source1: 1.0, source2: 0 }; // source2 muted
 
-      const mixed = mixSources(buffers, gains, audioContext);
+      const mixed = callMixSources(buffers, gains, audioContext);
       const mixedData = mixed.getChannelData(0);
       const source1Data = buffers.source1.getChannelData(0);
 
@@ -167,7 +147,7 @@ describe('mixSources - Mute/Solo Audio Mixing', () => {
       };
       const gains = { source1: 0, source2: 0 }; // All muted
 
-      const mixed = mixSources(buffers, gains, audioContext);
+      const mixed = callMixSources(buffers, gains, audioContext);
       const data = mixed.getChannelData(0);
 
       // All samples should be zero (silence)
@@ -182,7 +162,7 @@ describe('mixSources - Mute/Solo Audio Mixing', () => {
       };
       const gains = { source1: 1.0, source2: 0, source3: 1.0 }; // Middle muted
 
-      const mixed = mixSources(buffers, gains, audioContext);
+      const mixed = callMixSources(buffers, gains, audioContext);
       const data = mixed.getChannelData(0);
 
       // Output should exist and contain mixed source1 + source3
@@ -213,7 +193,7 @@ describe('mixSources - Mute/Solo Audio Mixing', () => {
       };
       const gains = { speech: 1.0, music: 0, noise: 0 }; // Solo speech
 
-      const mixed = mixSources(buffers, gains, audioContext);
+      const mixed = callMixSources(buffers, gains, audioContext);
       const mixedData = mixed.getChannelData(0);
       const speechData = buffers.speech.getChannelData(0);
 
@@ -230,7 +210,7 @@ describe('mixSources - Mute/Solo Audio Mixing', () => {
       };
       const gains = { source1: 1.5, source2: 0 }; // Solo source1 with gain boost
 
-      const mixed = mixSources(buffers, gains, audioContext);
+      const mixed = callMixSources(buffers, gains, audioContext);
       const mixedData = mixed.getChannelData(0);
       const source1Data = buffers.source1.getChannelData(0);
 
@@ -249,7 +229,7 @@ describe('mixSources - Mute/Solo Audio Mixing', () => {
       };
       const gains = { source1: 3.0 };
 
-      const mixed = mixSources(buffers, gains, audioContext);
+      const mixed = callMixSources(buffers, gains, audioContext);
       const data = mixed.getChannelData(0);
 
       // Should amplify and normalize if needed
@@ -264,7 +244,7 @@ describe('mixSources - Mute/Solo Audio Mixing', () => {
       };
       const gains = { source1: 0.01 };
 
-      const mixed = mixSources(buffers, gains, audioContext);
+      const mixed = callMixSources(buffers, gains, audioContext);
       const data = mixed.getChannelData(0);
 
       // Should produce very quiet output
@@ -280,7 +260,7 @@ describe('mixSources - Mute/Solo Audio Mixing', () => {
       };
       const gains = { loud: 2.0, quiet: 0.1 };
 
-      const mixed = mixSources(buffers, gains, audioContext);
+      const mixed = callMixSources(buffers, gains, audioContext);
       const data = mixed.getChannelData(0);
 
       // Loud source should dominate
@@ -293,7 +273,7 @@ describe('mixSources - Mute/Solo Audio Mixing', () => {
       const buffers = {};
       const gains = {};
 
-      expect(() => mixSources(buffers, gains, audioContext)).toThrow('No source buffers to mix');
+      expect(() => callMixSources(buffers, gains, audioContext)).toThrow('No source buffers to mix');
     });
 
     it('should handle missing gain defaults to 1.0', () => {
@@ -302,7 +282,7 @@ describe('mixSources - Mute/Solo Audio Mixing', () => {
       };
       const gains = {}; // No gain specified
 
-      const mixed = mixSources(buffers, gains, audioContext);
+      const mixed = callMixSources(buffers, gains, audioContext);
       const mixedData = mixed.getChannelData(0);
       const source1Data = buffers.source1.getChannelData(0);
 
@@ -319,7 +299,7 @@ describe('mixSources - Mute/Solo Audio Mixing', () => {
       };
       const gains = { source1: 1.0, source2: 1.0 };
 
-      const mixed = mixSources(buffers, gains, audioContext);
+      const mixed = callMixSources(buffers, gains, audioContext);
       const data = mixed.getChannelData(0);
 
       // Peak should be normalized to ≤ 1.0
@@ -333,7 +313,7 @@ describe('mixSources - Mute/Solo Audio Mixing', () => {
       };
       const gains = { solo: 1.0 };
 
-      const mixed = mixSources(buffers, gains, audioContext);
+      const mixed = callMixSources(buffers, gains, audioContext);
       const mixedData = mixed.getChannelData(0);
       const soloData = buffers.solo.getChannelData(0);
 
@@ -354,7 +334,7 @@ describe('mixSources - Mute/Solo Audio Mixing', () => {
       };
       const gains = { vocals: 1.0, drums: 0, bass: 0, guitar: 0 };
 
-      const mixed = mixSources(buffers, gains, audioContext);
+      const mixed = callMixSources(buffers, gains, audioContext);
       const mixedData = mixed.getChannelData(0);
       const vocalsData = buffers.vocals.getChannelData(0);
 
@@ -371,7 +351,7 @@ describe('mixSources - Mute/Solo Audio Mixing', () => {
       };
       const gains = { vocals: 1.5, music: 1.0 };
 
-      const mixed = mixSources(buffers, gains, audioContext);
+      const mixed = callMixSources(buffers, gains, audioContext);
       const data = mixed.getChannelData(0);
 
       // Should produce non-zero mixed output
@@ -387,23 +367,23 @@ describe('mixSources - Mute/Solo Audio Mixing', () => {
 
       // Start: all muted
       let gains = { s1: 0, s2: 0, s3: 0 };
-      let mixed = mixSources(buffers, gains, audioContext);
+      let mixed = callMixSources(buffers, gains, audioContext);
       expect(mixed.getChannelData(0).every(v => v === 0)).toBe(true);
 
       // Unmute s1
       gains = { s1: 1.0, s2: 0, s3: 0 };
-      mixed = mixSources(buffers, gains, audioContext);
+      mixed = callMixSources(buffers, gains, audioContext);
       expect(mixed.getChannelData(0).some(v => v !== 0)).toBe(true);
 
       // Unmute s2
       gains = { s1: 1.0, s2: 1.0, s3: 0 };
-      mixed = mixSources(buffers, gains, audioContext);
+      mixed = callMixSources(buffers, gains, audioContext);
       const peak2 = Math.max(...Array.from(mixed.getChannelData(0)).map(Math.abs));
       expect(peak2).toBeGreaterThan(0);
 
       // Unmute all
       gains = { s1: 1.0, s2: 1.0, s3: 1.0 };
-      mixed = mixSources(buffers, gains, audioContext);
+      mixed = callMixSources(buffers, gains, audioContext);
       const peak3 = Math.max(...Array.from(mixed.getChannelData(0)).map(Math.abs));
       expect(peak3).toBeGreaterThan(peak2);
     });
