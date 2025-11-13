@@ -11,24 +11,28 @@ import Controls from './components/Controls';
 import ModeSelector from './components/ModeSelector';
 import GenericMode, { GenericBand, genericBandsToBandSpecs } from './components/GenericMode';
 import CustomizedModePanel from './components/CustomizedModePanel';
-import { AISourceSeparation } from './components/AISourceSeparation';
 import { AudioPlayback } from './lib/playback';
 import { stftFrames, istft } from './lib/stft';
 import { Complex } from './lib/fft';
 import { generateSpectrogram, buildGainVector } from './lib/spectrogram';
 import { FrequencyBand, EqualizerMode, PlaybackState, SpectrogramData, BandSpec, STFTOptions } from './model/types';
-import { SpeechSeparationResult } from './lib/api';
+import { SpeechSeparationResult, SeparationResult } from './lib/api';
 import './App.css';
 
-type AppMode = 'preset' | 'generic' | 'custom' | 'ai-separation';
+type AppMode = 'preset' | 'generic' | 'custom';
+type ContentType = 'music' | 'speech';
+type ModelType = 'demucs' | 'dprnn';
 
 // AI separation cache for session persistence
 interface AISeparationCache {
-  speechResult: SpeechSeparationResult;
+  speechResult: SpeechSeparationResult | null;
+  musicResult: SeparationResult | null;
   sourceGains: Record<string, number>;
   sourceBuffers: Record<string, AudioBuffer>;
   timestamp: number;
   fileName: string;
+  contentType: ContentType;
+  modelType: ModelType;
 }
 
 function App() {
@@ -391,18 +395,26 @@ function App() {
 
   // Save AI separation results to cache
   const handleAICacheUpdate = (
-    speechResult: SpeechSeparationResult | null,
+    result: SpeechSeparationResult | SeparationResult | null,
     sourceGains: Record<string, number>,
-    sourceBuffers: Record<string, AudioBuffer>
+    sourceBuffers: Record<string, AudioBuffer>,
+    contentType: ContentType,
+    modelType: ModelType
   ) => {
-    if (speechResult && fileName) {
+    if (result && fileName) {
       setAISeparationCache({
-        speechResult, // Now non-null because of the check
+        speechResult: modelType === 'dprnn' ? result as SpeechSeparationResult : null,
+        musicResult: modelType === 'demucs' ? result as SeparationResult : null,
         sourceGains,
         sourceBuffers,
         timestamp: Date.now(),
         fileName,
+        contentType,
+        modelType,
       });
+    } else if (!result) {
+      // Clear cache when result is null
+      setAISeparationCache(null);
     }
   };
 
@@ -491,13 +503,6 @@ function App() {
           >
             Customized Modes
           </button>
-          <button
-            className={appMode === 'ai-separation' ? 'active' : ''}
-            onClick={() => handleModeSwitch('ai-separation')}
-            disabled={isProcessing}
-          >
-            AI Source Separation
-          </button>
         </div>
       )}
 
@@ -514,12 +519,7 @@ function App() {
         </div>
       )}
 
-      {/* AI Source Separation - works without loading a file */}
-      {appMode === 'ai-separation' && (
-        <AISourceSeparation />
-      )}
-
-      {originalBuffer && appMode !== 'ai-separation' && (
+      {originalBuffer && (
         <>
           <Controls
             playbackState={playbackState}
