@@ -1,0 +1,223 @@
+/**
+ * SourceCard Component Styles
+ * Styles for individual source control cards
+ */
+
+.card {
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.card:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  gap: 12px;
+}
+
+.label {
+  font-weight: 600;
+  color: #fff;
+  font-size: 1rem;
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* Action Buttons */
+.button {
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.button:focus-visible {
+  outline: 2px solid #646cff;
+  outline-offset: 2px;
+}
+
+/* Play Button */
+.playButton {
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+  white-space: nowrap;
+  font-family: inherit;
+  background: rgba(100, 200, 100, 0.2);
+  border: 1px solid rgba(100, 200, 100, 0.5);
+  color: #64c864;
+}
+
+.playButton:hover:not(:disabled) {
+  background: rgba(100, 200, 100, 0.4);
+  transform: translateY(-1px);
+}
+
+.playButton.playing {
+  background: rgba(100, 200, 100, 0.4);
+  border-color: rgba(100, 200, 100, 0.8);
+  box-shadow: 0 0 12px rgba(100, 200, 100, 0.5);
+}
+
+/* Solo Button */
+.soloButton {
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+  white-space: nowrap;
+  font-family: inherit;
+  background: rgba(138, 43, 226, 0.2);
+  border: 1px solid rgba(138, 43, 226, 0.5);
+  color: #ba8bff;
+}
+
+.soloButton:hover:not(:disabled) {
+  background: rgba(138, 43, 226, 0.4);
+  border-color: rgba(138, 43, 226, 0.7);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(138, 43, 226, 0.3);
+}
+
+.soloButton.soloed {
+  background: rgba(138, 43, 226, 0.5);
+  border-color: rgba(138, 43, 226, 0.8);
+  color: #fff;
+  box-shadow: 0 0 12px rgba(138, 43, 226, 0.6);
+}
+
+/* Mute Button */
+.muteButton {
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+  white-space: nowrap;
+  font-family: inherit;
+  background: rgba(255, 165, 0, 0.2);
+  border: 1px solid rgba(255, 165, 0, 0.5);
+  color: #ffa500;
+}
+
+.muteButton:hover:not(:disabled) {
+  background: rgba(255, 165, 0, 0.4);
+  transform: translateY(-1px);
+}
+
+.muteButton.muted {
+  background: rgba(255, 100, 100, 0.3);
+  border-color: rgba(255, 100, 100, 0.6);
+  color: #ff6464;
+}
+
+/* Gain Display */
+.gainValue {
+  color: #646cff;
+  font-weight: 600;
+  font-size: 0.9rem;
+  min-width: 48px;
+  text-align: right;
+}
+
+/* Gain Slider */
+.gainSlider {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+  margin-bottom: 8px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.gainSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  background: linear-gradient(135deg, #646cff, #ff64c8);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s;
+}
+
+.gainSlider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.gainSlider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  background: linear-gradient(135deg, #646cff, #ff64c8);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  border: none;
+  transition: transform 0.2s;
+}
+
+.gainSlider::-moz-range-thumb:hover {
+  transform: scale(1.2);
+}
+
+.gainSlider:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Source Info */
+.info {
+  margin-top: 8px;
+  font-size: 0.8rem;
+  color: #888;
+}
+
+.shape {
+  font-family: 'Courier New', monospace;
+}
+
+/* Spectrogram */
+.spectrogram {
+  margin-top: 12px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.spectrogramImage {
+  width: 100%;
+  height: auto;
+  display: block;
+  image-rendering: crisp-edges;
+}
