@@ -8,6 +8,7 @@ import { CustomizedMode, SliderSpec, BandSpec } from '../model/types';
 import { loadCustomizedMode, initializeSliderScales, validateScale, buildBandSpecsFromSliders } from '../lib/modes';
 import { AVAILABLE_CUSTOMIZED_MODES } from '../config/customizedModes';
 import { separateSpeechAudio, getSourceLabel, type SpeechSeparationResult } from '../lib/api';
+import { mixSources } from '../lib/audioMixer';
 
 type ProcessingMode = 'dsp' | 'ai';
 
@@ -91,7 +92,7 @@ export default function CustomizedModePanel({
       
       // Rehydrate playback: remix and notify parent immediately
       if (onAudioMixed && Object.keys(aiCache.sourceBuffers).length > 0) {
-        const mixed = mixSources(aiCache.sourceBuffers, aiCache.sourceGains);
+        const mixed = mixSources(aiCache.sourceBuffers, aiCache.sourceGains, audioContext);
         onAudioMixed(mixed);
       }
     }
@@ -149,7 +150,7 @@ export default function CustomizedModePanel({
       
       // Create initial mix with default gains
       if (onAudioMixed) {
-        const mixed = mixSources(buffers, initialGains);
+        const mixed = mixSources(buffers, initialGains, audioContext);
         onAudioMixed(mixed);
       }
       
@@ -173,7 +174,7 @@ export default function CustomizedModePanel({
       // Remix audio with NEW gains immediately (inside setter to avoid stale closure)
       if (speechResult && Object.keys(sourceBuffers).length > 0 && onAudioMixed) {
         try {
-          const mixed = mixSources(sourceBuffers, updated);
+          const mixed = mixSources(sourceBuffers, updated, audioContext);
           onAudioMixed(mixed);
         } catch (err) {
           console.error('[handleSourceGainChange] Failed to remix:', err);
@@ -210,70 +211,6 @@ export default function CustomizedModePanel({
     }
     
     return buffers;
-  };
-
-  // Mix all sources with their respective gains
-  // Only includes sources with gain > 0 for proper mute/solo behavior
-  const mixSources = (buffers: Record<string, AudioBuffer>, gains: Record<string, number>): AudioBuffer => {
-    const bufferKeys = Object.keys(buffers);
-    if (bufferKeys.length === 0) {
-      throw new Error('No source buffers to mix');
-    }
-    
-    // Filter to only unmuted sources (gain > 0)
-    const activeSources = bufferKeys.filter(key => (gains[key] ?? 1.0) > 0);
-    
-    // Validation: Log mute/solo state for debugging
-    if (import.meta.env.DEV) {
-      console.debug(`[mixSources] Active: ${activeSources.length}/${bufferKeys.length} sources`, {
-        active: activeSources.map(k => ({ key: k, gain: gains[k] })),
-        muted: bufferKeys.filter(k => (gains[k] ?? 1.0) === 0)
-      });
-    }
-    
-    // Handle edge case: all sources muted
-    if (activeSources.length === 0) {
-      console.warn('[mixSources] All sources muted - returning silence');
-      const firstBuffer = buffers[bufferKeys[0]];
-      return audioContext.createBuffer(1, firstBuffer.length, firstBuffer.sampleRate);
-    }
-    
-    // Get first active buffer to determine size and sample rate
-    const firstBuffer = buffers[activeSources[0]];
-    const length = firstBuffer.length;
-    const sampleRate = firstBuffer.sampleRate;
-    
-    // Create output buffer (mono)
-    const mixedBuffer = audioContext.createBuffer(1, length, sampleRate);
-    const mixedData = mixedBuffer.getChannelData(0);
-    
-    // Mix only active (unmuted) sources
-    for (const sourceKey of activeSources) {
-      const buffer = buffers[sourceKey];
-      const gain = gains[sourceKey] ?? 1.0;
-      const sourceData = buffer.getChannelData(0);
-      
-      for (let i = 0; i < length; i++) {
-        mixedData[i] += sourceData[i] * gain;
-      }
-    }
-    
-    // Normalize to prevent clipping
-    let maxVal = 0;
-    for (let i = 0; i < length; i++) {
-      maxVal = Math.max(maxVal, Math.abs(mixedData[i]));
-    }
-    if (maxVal > 1.0) {
-      const normFactor = 1.0 / maxVal;
-      for (let i = 0; i < length; i++) {
-        mixedData[i] *= normFactor;
-      }
-      if (import.meta.env.DEV) {
-        console.debug(`[mixSources] Normalized by ${normFactor.toFixed(3)} to prevent clipping`);
-      }
-    }
-    
-    return mixedBuffer;
   };
 
   // Play individual source
@@ -340,7 +277,7 @@ export default function CustomizedModePanel({
       // Remix with restored gains
       if (speechResult && onAudioMixed) {
         try {
-          const mixed = mixSources(sourceBuffers, restoredGains);
+          const mixed = mixSources(sourceBuffers, restoredGains, audioContext);
           onAudioMixed(mixed);
         } catch (err) {
           console.error('[toggleSolo] Failed to remix on unsolo:', err);
@@ -358,7 +295,7 @@ export default function CustomizedModePanel({
       // Remix with solo gains
       if (speechResult && onAudioMixed) {
         try {
-          const mixed = mixSources(sourceBuffers, soloGains);
+          const mixed = mixSources(sourceBuffers, soloGains, audioContext);
           onAudioMixed(mixed);
         } catch (err) {
           console.error('[toggleSolo] Failed to remix on solo:', err);
