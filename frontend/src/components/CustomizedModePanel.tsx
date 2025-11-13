@@ -11,11 +11,11 @@ import { separateSpeechAudio, getSourceLabel, type SpeechSeparationResult } from
 
 type ProcessingMode = 'dsp' | 'ai';
 
-// AI separation cache structure
+// Cache interface for AI separation results
 interface AISeparationCache {
-  speechResult: SpeechSeparationResult | null;
-  sourceGains: Map<string, number>;
-  sourceBuffers: Map<string, AudioBuffer>;
+  speechResult: SpeechSeparationResult;
+  sourceGains: Record<string, number>;
+  sourceBuffers: Record<string, AudioBuffer>;
   timestamp: number;
   fileName: string;
 }
@@ -28,8 +28,8 @@ interface CustomizedModePanelProps {
   aiCache?: AISeparationCache | null;
   onAICacheUpdate?: (
     speechResult: SpeechSeparationResult | null,
-    sourceGains: Map<string, number>,
-    sourceBuffers: Map<string, AudioBuffer>
+    sourceGains: Record<string, number>,
+    sourceBuffers: Record<string, AudioBuffer>
   ) => void;
   activeTab?: 'dsp' | 'ai';
   onTabChange?: (tab: 'dsp' | 'ai') => void;
@@ -51,13 +51,13 @@ export default function CustomizedModePanel({
   // DSP mode state (existing)
   const [currentMode, setCurrentMode] = useState<CustomizedMode | null>(null);
   const [currentModeId, setCurrentModeId] = useState<string>('');
-  const [sliderScales, setSliderScales] = useState<Map<string, number>>(new Map());
+  const [sliderScales, setSliderScales] = useState<Record<string, number>>({});
   
   // AI mode state
   const [speechResult, setSpeechResult] = useState<SpeechSeparationResult | null>(null);
-  const [sourceGains, setSourceGains] = useState<Map<string, number>>(new Map());
+  const [sourceGains, setSourceGains] = useState<Record<string, number>>({});
   const [aiProcessing, setAiProcessing] = useState<boolean>(false);
-  const [sourceBuffers, setSourceBuffers] = useState<Map<string, AudioBuffer>>(new Map());
+  const [sourceBuffers, setSourceBuffers] = useState<Record<string, AudioBuffer>>({});
   const [playingSource, setPlayingSource] = useState<string | null>(null); // Track which source is playing
   const [audioContext] = useState<AudioContext>(() => new AudioContext());
   const [currentSourceNode, setCurrentSourceNode] = useState<AudioBufferSourceNode | null>(null);
@@ -66,22 +66,35 @@ export default function CustomizedModePanel({
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Sync processing mode with parent activeTab prop
+  // Combined effect: sync tab state and restore cache with playback rehydration
   useEffect(() => {
+    // First, sync processing mode with parent activeTab
     if (activeTab !== processingMode) {
       setProcessingMode(activeTab);
+      return; // Exit early to avoid doing work during sync
     }
-  }, [activeTab]);
 
-  // Restore from cache when switching back to AI mode
-  useEffect(() => {
-    if (processingMode === 'ai' && aiCache && !speechResult) {
+    // Then, restore from cache when in AI mode
+    // Guard: only restore if cache fileName matches current audioFile
+    if (
+      processingMode === 'ai' && 
+      aiCache && 
+      !speechResult && 
+      audioFile && 
+      aiCache.fileName === audioFile.name
+    ) {
       // Restore cached results
       setSpeechResult(aiCache.speechResult);
       setSourceGains(aiCache.sourceGains);
       setSourceBuffers(aiCache.sourceBuffers);
+      
+      // Rehydrate playback: remix and notify parent immediately
+      if (onAudioMixed && Object.keys(aiCache.sourceBuffers).length > 0) {
+        const mixed = mixSources(aiCache.sourceBuffers, aiCache.sourceGains);
+        onAudioMixed(mixed);
+      }
     }
-  }, [processingMode, aiCache]);
+  }, [activeTab, processingMode, aiCache, speechResult, onAudioMixed, audioFile]);
 
   // Mode switching handler - ensures mutual exclusivity
   const handleModeSwitch = (newMode: ProcessingMode) => {
@@ -98,12 +111,12 @@ export default function CustomizedModePanel({
     if (newMode === 'dsp') {
       // Clear AI state when switching to DSP (don't clear cache)
       setSpeechResult(null);
-      setSourceGains(new Map());
-      setSourceBuffers(new Map());
+      setSourceGains({});
+      setSourceBuffers({});
       setAiProcessing(false);
     } else {
       // Clear DSP state when switching to AI
-      setSliderScales(new Map());
+      setSliderScales({});
       onBandSpecsChange([]);
     }
   };
@@ -127,9 +140,9 @@ export default function CustomizedModePanel({
       setSourceBuffers(buffers);
       
       // Initialize gain controls for each source
-      const initialGains = new Map<string, number>();
+      const initialGains: Record<string, number> = {};
       Object.keys(result.sources).forEach(sourceKey => {
-        initialGains.set(sourceKey, 1.0); // Default gain = 1.0
+        initialGains[sourceKey] = 1.0; // Default gain = 1.0
       });
       setSourceGains(initialGains);
       
@@ -154,11 +167,10 @@ export default function CustomizedModePanel({
   // AI mode: Handle source gain changes
   const handleSourceGainChange = (sourceKey: string, gain: number) => {
     setSourceGains(prev => {
-      const updated = new Map(prev);
-      updated.set(sourceKey, gain);
+      const updated = { ...prev, [sourceKey]: gain };
       
       // Update cache with new gains
-      if (onAICacheUpdate && speechResult && sourceBuffers.size > 0) {
+      if (onAICacheUpdate && speechResult && Object.keys(sourceBuffers).length > 0) {
         onAICacheUpdate(speechResult, updated, sourceBuffers);
       }
       
@@ -166,14 +178,14 @@ export default function CustomizedModePanel({
     });
     
     // Remix audio with new gains
-    if (speechResult && sourceBuffers.size > 0) {
+    if (speechResult && Object.keys(sourceBuffers).length > 0) {
       mixAndNotifyParent();
     }
   };
 
   // Convert speech separation result to AudioBuffers
-  const convertSourcesToBuffers = async (result: SpeechSeparationResult): Promise<Map<string, AudioBuffer>> => {
-    const buffers = new Map<string, AudioBuffer>();
+  const convertSourcesToBuffers = async (result: SpeechSeparationResult): Promise<Record<string, AudioBuffer>> => {
+    const buffers: Record<string, AudioBuffer> = {};
     
     for (const [sourceKey, sourceData] of Object.entries(result.sources)) {
       const audioData = sourceData.audio_data;
@@ -188,20 +200,21 @@ export default function CustomizedModePanel({
         channelData[i] = audioData[i];
       }
       
-      buffers.set(sourceKey, buffer);
+      buffers[sourceKey] = buffer;
     }
     
     return buffers;
   };
 
   // Mix all sources with their respective gains
-  const mixSources = (buffers: Map<string, AudioBuffer>, gains: Map<string, number>): AudioBuffer => {
-    if (buffers.size === 0) {
+  const mixSources = (buffers: Record<string, AudioBuffer>, gains: Record<string, number>): AudioBuffer => {
+    const bufferKeys = Object.keys(buffers);
+    if (bufferKeys.length === 0) {
       throw new Error('No source buffers to mix');
     }
     
     // Get first buffer to determine size and sample rate
-    const firstBuffer = Array.from(buffers.values())[0];
+    const firstBuffer = buffers[bufferKeys[0]];
     const length = firstBuffer.length;
     const sampleRate = firstBuffer.sampleRate;
     
@@ -210,8 +223,8 @@ export default function CustomizedModePanel({
     const mixedData = mixedBuffer.getChannelData(0);
     
     // Mix all sources
-    for (const [sourceKey, buffer] of buffers.entries()) {
-      const gain = gains.get(sourceKey) ?? 1.0;
+    for (const [sourceKey, buffer] of Object.entries(buffers)) {
+      const gain = gains[sourceKey] ?? 1.0;
       const sourceData = buffer.getChannelData(0);
       
       for (let i = 0; i < length; i++) {
@@ -235,7 +248,7 @@ export default function CustomizedModePanel({
 
   // Mix sources and notify parent component
   const mixAndNotifyParent = () => {
-    if (!speechResult || sourceBuffers.size === 0 || !onAudioMixed) return;
+    if (!speechResult || Object.keys(sourceBuffers).length === 0 || !onAudioMixed) return;
     
     try {
       const mixed = mixSources(sourceBuffers, sourceGains);
@@ -248,7 +261,7 @@ export default function CustomizedModePanel({
 
   // Play individual source
   const playSource = (sourceKey: string) => {
-    const buffer = sourceBuffers.get(sourceKey);
+    const buffer = sourceBuffers[sourceKey];
     if (!buffer) return;
     
     // Stop current playback
@@ -260,7 +273,7 @@ export default function CustomizedModePanel({
     
     // Apply gain
     const gainNode = audioContext.createGain();
-    gainNode.gain.value = sourceGains.get(sourceKey) ?? 1.0;
+    gainNode.gain.value = sourceGains[sourceKey] ?? 1.0;
     
     // Connect and play
     sourceNode.connect(gainNode);
@@ -291,7 +304,7 @@ export default function CustomizedModePanel({
 
   // Mute/unmute source (set gain to 0 or restore)
   const toggleMute = (sourceKey: string) => {
-    const currentGain = sourceGains.get(sourceKey) ?? 1.0;
+    const currentGain = sourceGains[sourceKey] ?? 1.0;
     const newGain = currentGain === 0 ? 1.0 : 0;
     handleSourceGainChange(sourceKey, newGain);
   };
@@ -316,7 +329,9 @@ export default function CustomizedModePanel({
       setCurrentModeId(modeName); // Track the mode ID
       
       const initialScales = initializeSliderScales(mode.sliders);
-      setSliderScales(initialScales);
+      // Convert Map to Record for React state
+      const scalesRecord = Object.fromEntries(initialScales);
+      setSliderScales(scalesRecord);
       const bandSpecs = buildBandSpecsFromSliders(mode.sliders, initialScales);
       onBandSpecsChange(bandSpecs);
     } catch (err) {
@@ -335,18 +350,20 @@ export default function CustomizedModePanel({
     if (!currentMode) return;
     
     const validatedValue = validateScale(value);
-    const updatedScales = new Map(sliderScales);
-    updatedScales.set(sliderId, validatedValue);
+    const updatedScales = { ...sliderScales, [sliderId]: validatedValue };
     setSliderScales(updatedScales);
     
-    const bandSpecs = buildBandSpecsFromSliders(currentMode.sliders, updatedScales);
+    // Convert back to Map for buildBandSpecsFromSliders
+    const scalesMap = new Map(Object.entries(updatedScales));
+    const bandSpecs = buildBandSpecsFromSliders(currentMode.sliders, scalesMap);
     onBandSpecsChange(bandSpecs);
   };
 
   const handleReset = () => {
     if (!currentMode) return;
     const defaultScales = initializeSliderScales(currentMode.sliders);
-    setSliderScales(defaultScales);
+    const scalesRecord = Object.fromEntries(defaultScales);
+    setSliderScales(scalesRecord);
     const bandSpecs = buildBandSpecsFromSliders(currentMode.sliders, defaultScales);
     onBandSpecsChange(bandSpecs);
   };
@@ -437,7 +454,7 @@ export default function CustomizedModePanel({
               <MultiWindowSlider
                 key={slider.id}
                 slider={slider}
-                value={sliderScales.get(slider.id) ?? slider.defaultScale}
+                value={sliderScales[slider.id] ?? slider.defaultScale}
                 onChange={(value) => handleSliderChange(slider.id, value)}
               />
             ))}
@@ -510,13 +527,13 @@ export default function CustomizedModePanel({
                         <button
                           onClick={() => toggleMute(sourceKey)}
                           disabled={disabled}
-                          className={`mute-button ${sourceGains.get(sourceKey) === 0 ? 'muted' : ''}`}
-                          title={sourceGains.get(sourceKey) === 0 ? 'Unmute' : 'Mute'}
+                          className={`mute-button ${sourceGains[sourceKey] === 0 ? 'muted' : ''}`}
+                          title={sourceGains[sourceKey] === 0 ? 'Unmute' : 'Mute'}
                         >
-                          {sourceGains.get(sourceKey) === 0 ? '🔇 Muted' : '🔊 Mute'}
+                          {sourceGains[sourceKey] === 0 ? '🔇 Muted' : '🔊 Mute'}
                         </button>
                         <span className="gain-value">
-                          {(sourceGains.get(sourceKey) ?? 1.0).toFixed(2)}×
+                          {(sourceGains[sourceKey] ?? 1.0).toFixed(2)}×
                         </span>
                       </div>
                     </div>
@@ -526,7 +543,7 @@ export default function CustomizedModePanel({
                       min="0"
                       max="2"
                       step="0.01"
-                      value={sourceGains.get(sourceKey) ?? 1.0}
+                      value={sourceGains[sourceKey] ?? 1.0}
                       onChange={(e) => handleSourceGainChange(sourceKey, parseFloat(e.target.value))}
                       disabled={disabled}
                       className="gain-slider"

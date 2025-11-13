@@ -24,9 +24,9 @@ type AppMode = 'preset' | 'generic' | 'custom' | 'ai-separation';
 
 // AI separation cache for session persistence
 interface AISeparationCache {
-  speechResult: SpeechSeparationResult | null;
-  sourceGains: Map<string, number>;
-  sourceBuffers: Map<string, AudioBuffer>;
+  speechResult: SpeechSeparationResult;
+  sourceGains: Record<string, number>;
+  sourceBuffers: Record<string, AudioBuffer>;
   timestamp: number;
   fileName: string;
 }
@@ -392,12 +392,12 @@ function App() {
   // Save AI separation results to cache
   const handleAICacheUpdate = (
     speechResult: SpeechSeparationResult | null,
-    sourceGains: Map<string, number>,
-    sourceBuffers: Map<string, AudioBuffer>
+    sourceGains: Record<string, number>,
+    sourceBuffers: Record<string, AudioBuffer>
   ) => {
     if (speechResult && fileName) {
       setAISeparationCache({
-        speechResult,
+        speechResult, // Now non-null because of the check
         sourceGains,
         sourceBuffers,
         timestamp: Date.now(),
