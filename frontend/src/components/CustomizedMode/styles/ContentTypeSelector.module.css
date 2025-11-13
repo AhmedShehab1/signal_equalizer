@@ -1,0 +1,69 @@
+/**
+ * ContentTypeSelector Component Styles
+ * Styles for Music vs Speech content type selection
+ */
+
+.container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding: 16px;
+  background: rgba(138, 43, 226, 0.05);
+  border: 1px solid rgba(138, 43, 226, 0.2);
+  border-radius: 8px;
+  flex-wrap: wrap;
+}
+
+.label {
+  font-weight: 600;
+  color: #8a2be2;
+  margin: 0;
+}
+
+.buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.button {
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  color: #aaa;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.9rem;
+  font-family: inherit;
+}
+
+.button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(138, 43, 226, 0.5);
+}
+
+.button.active {
+  background: rgba(138, 43, 226, 0.3);
+  border-color: #8a2be2;
+  color: #fff;
+  font-weight: 600;
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.button:focus-visible {
+  outline: 2px solid #8a2be2;
+  outline-offset: 2px;
+}
+
+.hint {
+  flex-basis: 100%;
+  margin: 8px 0 0 0;
+  font-size: 0.85rem;
+  color: #aaa;
+  font-style: italic;
+}
