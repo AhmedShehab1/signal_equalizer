@@ -16,6 +16,7 @@ export { default as CustomizedModePanel } from '../CustomizedModePanel';
 // Presentational Components
 export { ModeToggle } from './ModeToggle';
 export { ContentTypeSelector } from './ContentTypeSelector';
+export { DSPControls } from './DSPControls';
 export { AIControls } from './AIControls';
 export { SourceCard } from './SourceCard';
 export { SourceList } from './SourceList';
