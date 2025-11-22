@@ -419,9 +419,13 @@ export default function CustomizedModePanel({
   };
 
   const getSourceLabel = (sourceId: string): string => {
-    if (contentType === 'speech') {
-      return getSourceLabel(sourceId);
+    // Speech sources: source_0, source_1, etc.
+    if (sourceId.startsWith('source_')) {
+      const index = parseInt(sourceId.split('_')[1]);
+      return `Speaker ${index + 1}`; // Convert 0-indexed to 1-indexed for display
     }
+    
+    // Music sources: drums, bass, vocals, other
     return sourceId.charAt(0).toUpperCase() + sourceId.slice(1);
   };
 
