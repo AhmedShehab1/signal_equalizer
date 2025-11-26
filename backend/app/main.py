@@ -14,6 +14,7 @@ import requests
 
 from app.services.demucs_service import get_demucs_service
 from app.services.dprnn_service import get_dprnn_service
+from app.routers import dsp_router
 
 ASSETS_DIR: Final[Path] = Path(__file__).resolve().parent.parent / "assets"
 SAMPLE_AUDIO_URL: Final[str] = "https://download.pytorch.org/torchaudio/tutorial-assets/hdemucs_mix.wav"
@@ -67,6 +68,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Routers
+app.include_router(dsp_router.router)
 
 
 @app.get("/")
