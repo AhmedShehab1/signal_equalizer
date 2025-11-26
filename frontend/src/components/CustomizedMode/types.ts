@@ -71,7 +71,7 @@ export interface CustomizedModePanelProps {
   audioFile?: File | null;
   
   /** Callback when AI sources are mixed */
-  onAudioMixed?: (mixedBuffer: AudioBuffer) => void;
+  onAudioMixed?: (mixedBuffer: AudioBuffer) => void | Promise<void>;
   
   /** Cached AI separation results */
   aiCache?: AISeparationCache | null;
