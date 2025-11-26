@@ -1,8 +1,9 @@
 /**
  * Generic Mode: User-defined frequency subdivisions with linear gain [0.0 - 2.0]
+ * TICKET 3: Uses local staging to prevent processing loops during typing
  */
 
-import { useState } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { BandSpec } from '../model/types';
 import './GenericMode.css';
 
@@ -11,6 +12,13 @@ interface GenericBand {
   startHz: number;
   endHz: number;
   scale: number; // Linear gain [0.0 - 2.0]
+}
+
+// Local editing state for frequency inputs (prevents processing on each keystroke)
+interface FreqEditState {
+  bandId: string;
+  field: 'startHz' | 'endHz';
+  value: string;
 }
 
 interface GenericModeProps {
@@ -54,36 +62,77 @@ export default function GenericMode({ onBandsChange, sampleRate, disabled = fals
     { id: '1', startHz: 20, endHz: 200, scale: 1.0 },
   ]);
   const [expandedBand, setExpandedBand] = useState<string | null>(null);
+  
+  // TICKET 3: Local staging for frequency inputs to prevent processing on each keystroke
+  const [freqEdits, setFreqEdits] = useState<Record<string, FreqEditState>>({});
+  
+  // Track the last committed bands to avoid redundant processing
+  const lastCommittedRef = useRef<string>('');
+  
+  // Debounce timer ref for auto-commit
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const nyquist = sampleRate / 2;
+  
+  // Helper to check if processing should be triggered
+  // Skip if all bands have unity gain (no actual EQ effect)
+  const shouldTriggerProcessing = useCallback((bandsToCheck: GenericBand[]): boolean => {
+    // Always process if any band has non-unity gain
+    return bandsToCheck.some(b => Math.abs(b.scale - 1.0) > 0.001);
+  }, []);
+  
+  // Commit bands to parent (triggers processing)
+  const commitBands = useCallback((updatedBands: GenericBand[], forceProcess = false) => {
+    const serialized = JSON.stringify(updatedBands.map(b => ({
+      startHz: b.startHz,
+      endHz: b.endHz,
+      scale: b.scale,
+    })));
+    
+    // Skip if nothing changed
+    if (serialized === lastCommittedRef.current && !forceProcess) {
+      return;
+    }
+    
+    // Skip processing if all bands are at unity gain (no effect)
+    if (!forceProcess && !shouldTriggerProcessing(updatedBands)) {
+      lastCommittedRef.current = serialized;
+      return;
+    }
+    
+    lastCommittedRef.current = serialized;
+    onBandsChange(updatedBands);
+  }, [onBandsChange, shouldTriggerProcessing]);
 
+  // Add band WITHOUT triggering processing (new bands have unity gain = no effect)
   const addBand = () => {
     const newBand: GenericBand = {
       id: Date.now().toString(),
       startHz: 1000,
       endHz: 2000,
-      scale: 1.0,
+      scale: 1.0, // Unity gain - no processing needed
     };
     const updatedBands = [...bands, newBand];
     setBands(updatedBands);
-    onBandsChange(updatedBands);
+    // Don't call onBandsChange - new band at unity gain has no effect
+    // User must adjust gain to trigger processing
   };
 
   const deleteBand = (id: string) => {
     const updatedBands = bands.filter(b => b.id !== id);
     setBands(updatedBands);
-    onBandsChange(updatedBands);
+    // Deleting a band can change the output, so commit
+    commitBands(updatedBands, true);
   };
 
+  // Update band with staging for frequency fields
   const updateBand = (id: string, field: keyof GenericBand, value: number) => {
     // Validate and clamp values
     let clampedValue = value;
     
     if (field === 'startHz' || field === 'endHz') {
-      // Clamp frequency to [0, nyquist]
       clampedValue = Math.max(0, Math.min(nyquist, value));
     } else if (field === 'scale') {
-      // Clamp scale to [0, 2]
       clampedValue = Math.max(0, Math.min(2, value));
     }
     
@@ -91,7 +140,81 @@ export default function GenericMode({ onBandsChange, sampleRate, disabled = fals
       b.id === id ? { ...b, [field]: clampedValue } : b
     );
     setBands(updatedBands);
-    onBandsChange(updatedBands);
+    
+    // For gain changes, commit immediately (this is what affects the audio)
+    if (field === 'scale') {
+      commitBands(updatedBands);
+    }
+    // For frequency changes, use debounced commit (user might still be typing)
+    else {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      debounceTimerRef.current = setTimeout(() => {
+        commitBands(updatedBands);
+      }, 600); // 600ms debounce for frequency typing
+    }
+  };
+  
+  // Handle frequency input change (staged, doesn't trigger processing)
+  const handleFreqInputChange = (bandId: string, field: 'startHz' | 'endHz', rawValue: string) => {
+    const editKey = `${bandId}-${field}`;
+    setFreqEdits(prev => ({
+      ...prev,
+      [editKey]: { bandId, field, value: rawValue },
+    }));
+  };
+  
+  // Commit frequency edit on blur or Enter
+  const commitFreqEdit = (bandId: string, field: 'startHz' | 'endHz') => {
+    const editKey = `${bandId}-${field}`;
+    const edit = freqEdits[editKey];
+    
+    if (edit) {
+      const numValue = parseFloat(edit.value) || 0;
+      updateBand(bandId, field, numValue);
+      
+      // Clear the edit state
+      setFreqEdits(prev => {
+        const next = { ...prev };
+        delete next[editKey];
+        return next;
+      });
+    }
+  };
+  
+  // Get the display value for frequency input (edited value or actual value)
+  const getFreqInputValue = (bandId: string, field: 'startHz' | 'endHz', actualValue: number): string => {
+    const editKey = `${bandId}-${field}`;
+    const edit = freqEdits[editKey];
+    return edit ? edit.value : actualValue.toString();
+  };
+  
+  // Check if a frequency field is being edited
+  const isFreqEditing = (bandId: string, field: 'startHz' | 'endHz'): boolean => {
+    const editKey = `${bandId}-${field}`;
+    return editKey in freqEdits;
+  };
+  
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
+  
+  // Apply frequency preset (both start and end at once, single commit)
+  const applyFreqPreset = (id: string, startHz: number, endHz: number) => {
+    const clampedStart = Math.max(0, Math.min(nyquist, startHz));
+    const clampedEnd = Math.max(0, Math.min(nyquist, endHz));
+    
+    const updatedBands = bands.map(b =>
+      b.id === id ? { ...b, startHz: clampedStart, endHz: clampedEnd } : b
+    );
+    setBands(updatedBands);
+    commitBands(updatedBands);
   };
 
   const exportScheme = () => {
@@ -223,7 +346,7 @@ export default function GenericMode({ onBandsChange, sampleRate, disabled = fals
         <div className="header-left">
           <div className="header-title">
             <span className="header-icon">🎛️</span>
-            <h2>Custom Bands</h2>
+            <h2>Generic Bands</h2>
             <span className="band-count-inline">{bands.length} bands</span>
           </div>
         </div>
@@ -338,9 +461,12 @@ export default function GenericMode({ onBandsChange, sampleRate, disabled = fals
                           type="number"
                           min="0"
                           max={nyquist}
-                          value={band.startHz}
-                          onChange={(e) => updateBand(band.id, 'startHz', parseFloat(e.target.value) || 0)}
+                          value={getFreqInputValue(band.id, 'startHz', band.startHz)}
+                          onChange={(e) => handleFreqInputChange(band.id, 'startHz', e.target.value)}
+                          onBlur={() => commitFreqEdit(band.id, 'startHz')}
+                          onKeyDown={(e) => e.key === 'Enter' && commitFreqEdit(band.id, 'startHz')}
                           disabled={disabled}
+                          className={isFreqEditing(band.id, 'startHz') ? 'editing' : ''}
                         />
                       </label>
                       <label>
@@ -349,18 +475,21 @@ export default function GenericMode({ onBandsChange, sampleRate, disabled = fals
                           type="number"
                           min="0"
                           max={nyquist}
-                          value={band.endHz}
-                          onChange={(e) => updateBand(band.id, 'endHz', parseFloat(e.target.value) || 0)}
+                          value={getFreqInputValue(band.id, 'endHz', band.endHz)}
+                          onChange={(e) => handleFreqInputChange(band.id, 'endHz', e.target.value)}
+                          onBlur={() => commitFreqEdit(band.id, 'endHz')}
+                          onKeyDown={(e) => e.key === 'Enter' && commitFreqEdit(band.id, 'endHz')}
                           disabled={disabled}
+                          className={isFreqEditing(band.id, 'endHz') ? 'editing' : ''}
                         />
                       </label>
                     </div>
                     <div className="freq-presets-compact">
-                      <button onClick={() => { updateBand(band.id, 'startHz', 20); updateBand(band.id, 'endHz', 200); }} disabled={disabled}>Sub</button>
-                      <button onClick={() => { updateBand(band.id, 'startHz', 200); updateBand(band.id, 'endHz', 800); }} disabled={disabled}>Bass</button>
-                      <button onClick={() => { updateBand(band.id, 'startHz', 800); updateBand(band.id, 'endHz', 2500); }} disabled={disabled}>Mid</button>
-                      <button onClick={() => { updateBand(band.id, 'startHz', 2500); updateBand(band.id, 'endHz', 8000); }} disabled={disabled}>High</button>
-                      <button onClick={() => { updateBand(band.id, 'startHz', 8000); updateBand(band.id, 'endHz', 20000); }} disabled={disabled}>Air</button>
+                      <button onClick={() => applyFreqPreset(band.id, 20, 200)} disabled={disabled}>Sub</button>
+                      <button onClick={() => applyFreqPreset(band.id, 200, 800)} disabled={disabled}>Bass</button>
+                      <button onClick={() => applyFreqPreset(band.id, 800, 2500)} disabled={disabled}>Mid</button>
+                      <button onClick={() => applyFreqPreset(band.id, 2500, 8000)} disabled={disabled}>High</button>
+                      <button onClick={() => applyFreqPreset(band.id, 8000, 20000)} disabled={disabled}>Air</button>
                     </div>
                     <div className="gain-presets-compact">
                       <button onClick={() => updateBand(band.id, 'scale', 0)} disabled={disabled}>Mute</button>

@@ -243,15 +243,30 @@ function App() {
   }, []);
 
   const handleFileLoad = async (buffer: AudioBuffer, name: string, file: File) => {
-    setOriginalBuffer(buffer);
+    // === TICKET 1 FIX: Reset ALL processing-derived state before storing new buffer ===
+    
+    // 1. Stop any active playback immediately
+    playbackRef.current.stop();
+    
+    // 2. Increment recompute token to cancel any in-flight processing
+    recomputeTokenRef.current++;
+    
+    // 3. Clear all derived/output state
     setProcessedBuffer(null);
-    setFileName(name);
-    setAudioFile(file); // Store raw file for AI processing
+    setCustomModeBandSpecs([]);
+    setProcessingError(null);
+    setIsProcessing(false);
     
-    // Clear AI separation cache when new file is loaded
+    // 4. Clear AI separation cache
     setAISeparationCache(null);
-    setCustomModeTab('dsp'); // Reset to DSP tab
+    setCustomModeTab('dsp');
     
+    // 5. Now set the new file info
+    setOriginalBuffer(buffer);
+    setFileName(name);
+    setAudioFile(file);
+    
+    // 6. Reset playback state completely
     setPlaybackState({
       isPlaying: false,
       currentTime: 0,
@@ -259,19 +274,17 @@ function App() {
       playbackRate: 1.0,
     });
 
-    // Initialize default generic bands
+    // 7. Initialize default generic bands
     const defaultGenericBands: GenericBand[] = [
       { id: '1', startHz: 20, endHz: 200, scale: 1.0 },
     ];
     setGenericBands(defaultGenericBands);
 
-    // Set up playback with original buffer initially
+    // 8. Set up playback with original buffer (not processed, since we cleared it)
     playbackRef.current.setBuffer(buffer);
-    
-    // Reset playback rate to 1.0
     playbackRef.current.setPlaybackRate(1.0);
 
-    // Initial processing with default bands
+    // 9. Initial processing with default bands
     await runRecompute(genericBandsToBandSpecs(defaultGenericBands));
   };
 

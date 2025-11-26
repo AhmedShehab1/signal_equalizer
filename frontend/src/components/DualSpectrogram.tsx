@@ -1,6 +1,7 @@
 /**
  * DualSpectrogram - Input and Output Spectrograms with Toggle
  * Shows real-time frequency analysis for both input and processed signals
+ * TICKET 2: Added zoom/pan with chartjs-plugin-zoom and auto-fit to signal
  */
 
 import { useMemo, useCallback, useState, useEffect, useRef } from 'react';
@@ -18,12 +19,13 @@ import {
   ChartOptions,
   ChartData,
 } from 'chart.js';
+import zoomPlugin from 'chartjs-plugin-zoom';
 import { Line } from 'react-chartjs-2';
 import { stftFrames } from '../lib/stft';
 import { STFTOptions } from '../model/types';
 import './DualSpectrogram.css';
 
-// Register Chart.js components
+// Register Chart.js components including zoom plugin
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -33,7 +35,8 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
-  Filler
+  Filler,
+  zoomPlugin
 );
 
 export type ScaleType = 'linear' | 'logarithmic';
@@ -125,9 +128,11 @@ export default function DualSpectrogram({
   const [scaleType, setScaleType] = useState<ScaleType>('logarithmic');
   const [isComputing, setIsComputing] = useState(false);
   const [showOverlay, setShowOverlay] = useState(true);
+  const [isAutoFit, setIsAutoFit] = useState(false);
   
   const inputChartRef = useRef<ChartJS<'line'>>(null);
   const outputChartRef = useRef<ChartJS<'line'>>(null);
+  const overlayChartRef = useRef<ChartJS<'line'>>(null);
 
   // Compute input spectrum when buffer changes
   useEffect(() => {
@@ -241,7 +246,7 @@ export default function DualSpectrogram({
   const inputProcessed = useMemo(() => processData(inputSpectrum, sampleRate), [inputSpectrum, sampleRate, processData]);
   const outputProcessed = useMemo(() => processData(outputSpectrum, sampleRate), [outputSpectrum, sampleRate, processData]);
 
-  // Chart options factory
+  // Chart options factory with zoom/pan support
   const createChartOptions = useCallback((theme: typeof INPUT_THEME, frequencies: number[]): ChartOptions<'line'> => ({
     responsive: true,
     maintainAspectRatio: false,
@@ -272,6 +277,31 @@ export default function DualSpectrogram({
             const value = item.parsed.y ?? 0;
             return `${value.toFixed(1)} dB`;
           },
+        },
+      },
+      // TICKET 2: Add zoom/pan for split view charts
+      zoom: {
+        pan: {
+          enabled: true,
+          mode: 'xy',
+        },
+        zoom: {
+          wheel: {
+            enabled: true,
+          },
+          pinch: {
+            enabled: true,
+          },
+          drag: {
+            enabled: true,
+            backgroundColor: 'rgba(0, 245, 255, 0.1)',
+            borderColor: theme.primary,
+            borderWidth: 1,
+          },
+          mode: 'xy',
+        },
+        limits: {
+          y: { min: -100, max: 10 },
         },
       },
     },
@@ -371,72 +401,137 @@ export default function DualSpectrogram({
     };
   }, [inputProcessed, outputProcessed]);
 
-  const overlayChartOptions = useMemo((): ChartOptions<'line'> => ({
-    responsive: true,
-    maintainAspectRatio: false,
-    animation: { duration: 150 },
-    interaction: { mode: 'index', intersect: false },
-    plugins: {
-      legend: {
-        display: true,
-        position: 'top',
-        align: 'end',
-        labels: {
-          color: 'rgba(255, 255, 255, 0.8)',
-          boxWidth: 12,
-          padding: 15,
-          font: { size: 11 },
-        },
-      },
-      tooltip: {
-        enabled: true,
-        backgroundColor: 'rgba(0, 0, 0, 0.85)',
-        titleColor: '#fff',
-        bodyColor: '#fff',
-        borderColor: 'rgba(255, 255, 255, 0.2)',
-        borderWidth: 1,
-        cornerRadius: 6,
-        padding: 10,
-      },
-    },
-    scales: {
-      x: {
-        type: 'category',
-        display: true,
-        title: {
+  // Compute Y-axis min/max from data for auto-fit
+  const computeYAxisLimits = useCallback((data: number[]): { min: number; max: number } => {
+    if (data.length === 0) return { min: -80, max: 0 };
+    
+    let min = Math.min(...data);
+    let max = Math.max(...data);
+    
+    // Add 5% padding
+    const range = max - min || 10;
+    min = Math.max(-100, min - range * 0.05);
+    max = Math.min(10, max + range * 0.05);
+    
+    return { min, max };
+  }, []);
+
+  // Reset zoom on all charts
+  const handleResetZoom = useCallback(() => {
+    overlayChartRef.current?.resetZoom();
+    inputChartRef.current?.resetZoom();
+    outputChartRef.current?.resetZoom();
+    setIsAutoFit(false);
+  }, []);
+
+  // Auto-fit to signal range
+  const handleAutoFit = useCallback(() => {
+    setIsAutoFit(true);
+    // The chart options will use computed limits when isAutoFit is true
+  }, []);
+
+  const overlayChartOptions = useMemo((): ChartOptions<'line'> => {
+    // Compute Y limits when auto-fit is enabled
+    const allData = [
+      ...(inputProcessed?.data || []),
+      ...(outputProcessed?.data || []),
+    ];
+    const yLimits = isAutoFit ? computeYAxisLimits(allData) : { min: -80, max: 0 };
+    
+    return {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 150 },
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
           display: true,
-          text: scaleType === 'logarithmic' ? 'Frequency (Log)' : 'Frequency (Linear)',
-          color: 'rgba(255, 255, 255, 0.6)',
-          font: { size: 10 },
+          position: 'top',
+          align: 'end',
+          labels: {
+            color: 'rgba(255, 255, 255, 0.8)',
+            boxWidth: 12,
+            padding: 15,
+            font: { size: 11 },
+          },
         },
-        ticks: {
-          color: 'rgba(255, 255, 255, 0.5)',
-          maxRotation: 0,
-          autoSkip: true,
-          maxTicksLimit: 10,
-          font: { size: 9 },
+        tooltip: {
+          enabled: true,
+          backgroundColor: 'rgba(0, 0, 0, 0.85)',
+          titleColor: '#fff',
+          bodyColor: '#fff',
+          borderColor: 'rgba(255, 255, 255, 0.2)',
+          borderWidth: 1,
+          cornerRadius: 6,
+          padding: 10,
         },
-        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+        // TICKET 2: Add zoom/pan plugin configuration
+        zoom: {
+          pan: {
+            enabled: true,
+            mode: 'xy',
+            modifierKey: 'shift', // Hold shift to pan
+          },
+          zoom: {
+            wheel: {
+              enabled: true,
+              modifierKey: 'ctrl', // Hold ctrl/cmd to zoom with wheel
+            },
+            pinch: {
+              enabled: true,
+            },
+            drag: {
+              enabled: true,
+              backgroundColor: 'rgba(0, 245, 255, 0.1)',
+              borderColor: 'rgba(0, 245, 255, 0.5)',
+              borderWidth: 1,
+            },
+            mode: 'xy',
+          },
+          limits: {
+            y: { min: -100, max: 10 },
+          },
+        },
       },
-      y: {
-        type: 'linear',
-        display: true,
-        title: {
+      scales: {
+        x: {
+          type: 'category',
           display: true,
-          text: 'Magnitude (dB)',
-          color: 'rgba(255, 255, 255, 0.6)',
-          font: { size: 10 },
+          title: {
+            display: true,
+            text: scaleType === 'logarithmic' ? 'Frequency (Log)' : 'Frequency (Linear)',
+            color: 'rgba(255, 255, 255, 0.6)',
+            font: { size: 10 },
+          },
+          ticks: {
+            color: 'rgba(255, 255, 255, 0.5)',
+            maxRotation: 0,
+            autoSkip: true,
+            maxTicksLimit: 10,
+            font: { size: 9 },
+          },
+          grid: { color: 'rgba(255, 255, 255, 0.05)' },
         },
-        ticks: {
-          color: 'rgba(255, 255, 255, 0.5)',
-          font: { size: 9 },
+        y: {
+          type: 'linear',
+          display: true,
+          title: {
+            display: true,
+            text: 'Magnitude (dB)',
+            color: 'rgba(255, 255, 255, 0.6)',
+            font: { size: 10 },
+          },
+          ticks: {
+            color: 'rgba(255, 255, 255, 0.5)',
+            font: { size: 9 },
+          },
+          grid: { color: 'rgba(255, 255, 255, 0.05)' },
+          min: yLimits.min,
+          max: yLimits.max,
         },
-        grid: { color: 'rgba(255, 255, 255, 0.05)' },
-        min: -80,
-        max: 0,
       },
-    },
-  }), [scaleType]);
+    };
+  }, [scaleType, inputProcessed, outputProcessed, isAutoFit, computeYAxisLimits]);
 
   const handleToggle = useCallback(() => {
     onVisibilityChange?.(!visible);
@@ -465,6 +560,24 @@ export default function DualSpectrogram({
         </div>
         
         <div className="header-controls">
+          {/* Zoom controls - TICKET 2 */}
+          <div className="zoom-controls">
+            <button
+              className="zoom-btn"
+              onClick={handleAutoFit}
+              title="Fit to signal range"
+            >
+              📐 Fit
+            </button>
+            <button
+              className="zoom-btn"
+              onClick={handleResetZoom}
+              title="Reset zoom to default"
+            >
+              🔄 Reset
+            </button>
+          </div>
+          
           {/* View mode toggle */}
           <div className="view-toggle">
             <button
@@ -510,7 +623,7 @@ export default function DualSpectrogram({
         /* Overlay View - Both signals on one chart */
         <div className="spectrogram-overlay" style={{ height }}>
           {inputProcessed ? (
-            <Line data={overlayChartData} options={overlayChartOptions} />
+            <Line ref={overlayChartRef} data={overlayChartData} options={overlayChartOptions} />
           ) : (
             <div className="spectrogram-empty">
               <span>Load an audio file to see the frequency spectrum</span>
@@ -562,9 +675,11 @@ export default function DualSpectrogram({
       
       <div className="spectrogram-footer">
         <span className="info-text">
-          {scaleType === 'logarithmic' ? '📐 Logarithmic scale' : '📏 Linear scale'}
+          {scaleType === 'logarithmic' ? '📐 Log' : '📏 Linear'}
           {' · '}
           {LOG_MIN_FREQ} Hz - {formatFrequencyLabel((sampleRate / 2), true)}
+          {' · '}
+          <span className="zoom-hint">Drag to zoom • Scroll to zoom • Shift+drag to pan</span>
         </span>
         <span className="sample-rate">Fs: {sampleRate} Hz</span>
       </div>
