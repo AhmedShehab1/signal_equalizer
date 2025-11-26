@@ -1,7 +1,7 @@
 /**
  * ModeToggle Component
  * 
- * Simple toggle control for switching between DSP (Band EQ) and AI (Source Separation) processing modes.
+ * Toggle control for switching between Advanced (DSP) and Expert (AI) processing modes.
  * Presentational component with no internal state - fully controlled by parent.
  * 
  * @example
@@ -15,6 +15,7 @@
  */
 
 import type { ModeToggleProps } from './types';
+import './CustomizedMode.css';
 
 export function ModeToggle({ 
   processingMode, 
@@ -30,18 +31,18 @@ export function ModeToggle({
           onClick={() => onChange('dsp')}
           disabled={disabled}
           aria-pressed={processingMode === 'dsp'}
-          aria-label="Switch to DSP Band EQ mode"
+          aria-label="Switch to Advanced DSP mode"
         >
-          DSP (Band EQ)
+          🏛️ Advanced
         </button>
         <button
           className={`toggle-button ${processingMode === 'ai' ? 'active' : ''}`}
           onClick={() => onChange('ai')}
           disabled={disabled}
           aria-pressed={processingMode === 'ai'}
-          aria-label="Switch to AI Source Separation mode"
+          aria-label="Switch to Expert AI mode"
         >
-          AI Separation
+          🧠 Expert
         </button>
       </div>
     </div>
