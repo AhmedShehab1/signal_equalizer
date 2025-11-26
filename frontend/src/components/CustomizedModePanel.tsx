@@ -1,10 +1,14 @@
 /**
- * CustomizedModePanel - Orchestrator Component
+ * CustomizedModePanel - Compact Expert Mode Orchestrator
  * 
- * Coordinates between DSP (Band EQ) and AI (Source Separation) processing modes.
- * Delegates to specialized subcomponents while managing top-level state and cache restoration.
+ * Option-based selection: AI vs DSP → subcategory selection
+ * Collapsible sections for cleaner UI, horizontal expansion for tools.
  * 
- * Refactored from 940-line monolith to clean orchestrator pattern.
+ * User flow:
+ * 1. Choose processing type: AI (Expert) or DSP (Advanced)
+ * 2. For AI: Choose Speech/Vocals or Music
+ * 3. For DSP: Choose Musical Instruments or Human Voices  
+ * 4. Expand tools horizontally based on selection
  */
 
 import { useState, useEffect } from 'react';
@@ -19,8 +23,6 @@ import {
 import { mixSources } from '../lib/audioMixer';
 
 // Import refactored components
-import { ModeToggle } from './CustomizedMode/ModeToggle';
-import { ContentTypeSelector } from './CustomizedMode/ContentTypeSelector';
 import { DSPControls } from './CustomizedMode/DSPControls';
 import { AIControls } from './CustomizedMode/AIControls';
 import { SourceList } from './CustomizedMode/SourceList';
@@ -30,8 +32,11 @@ import type {
   CustomizedModePanelProps 
 } from './CustomizedMode/types';
 
+// DSP content types for Expert DSP mode
+type DSPContentType = 'instruments' | 'voices';
+
 /**
- * Main orchestrator component
+ * Main orchestrator component - Compact Expert Mode
  */
 export default function CustomizedModePanel({ 
   onBandSpecsChange, 
@@ -46,14 +51,23 @@ export default function CustomizedModePanel({
   
   // ===== Top-level State Management =====
   
-  // Content type with session persistence
+  // Processing mode (AI or DSP)
+  const [processingMode, setProcessingMode] = useState<ProcessingMode>(activeTab);
+  
+  // AI content type (speech/music)
   const [contentType, setContentType] = useState<ContentType>(() => {
     const saved = sessionStorage.getItem('customizedMode:contentType');
     return (saved === 'music' || saved === 'speech') ? saved : 'speech';
   });
   
-  // Processing mode (controlled by parent or local)
-  const [processingMode, setProcessingMode] = useState<ProcessingMode>(activeTab);
+  // DSP content type (instruments/voices)
+  const [dspContentType, setDspContentType] = useState<DSPContentType>(() => {
+    const saved = sessionStorage.getItem('customizedMode:dspContentType');
+    return (saved === 'instruments' || saved === 'voices') ? saved : 'instruments';
+  });
+  
+  // Expanded sections
+  const [showTools, setShowTools] = useState<boolean>(true);
   
   // AI mode state
   const [speechResult, setSpeechResult] = useState<SpeechSeparationResult | null>(null);
@@ -77,17 +91,19 @@ export default function CustomizedModePanel({
   useEffect(() => {
     sessionStorage.setItem('customizedMode:contentType', contentType);
   }, [contentType]);
+  
+  useEffect(() => {
+    sessionStorage.setItem('customizedMode:dspContentType', dspContentType);
+  }, [dspContentType]);
 
   // ===== Cache Restoration =====
   
   useEffect(() => {
-    // Sync processing mode with parent
     if (activeTab !== processingMode) {
       setProcessingMode(activeTab);
       return;
     }
 
-    // Restore from cache when in AI mode
     if (
       processingMode === 'ai' && 
       aiCache && 
@@ -97,7 +113,6 @@ export default function CustomizedModePanel({
       aiCache.fileName === audioFile.name &&
       aiCache.contentType === contentType
     ) {
-      // Restore appropriate result based on content type
       if (contentType === 'speech') {
         setSpeechResult(aiCache.speechResult);
       } else {
@@ -106,7 +121,6 @@ export default function CustomizedModePanel({
       setSourceGains(aiCache.sourceGains);
       setSourceBuffers(aiCache.sourceBuffers);
       
-      // Rehydrate playback
       if (onAudioMixed && Object.keys(aiCache.sourceBuffers).length > 0) {
         const mixed = mixSources(aiCache.sourceBuffers, aiCache.sourceGains, audioContext);
         onAudioMixed(mixed);
@@ -121,12 +135,12 @@ export default function CustomizedModePanel({
     
     setProcessingMode(newMode);
     setError(null);
+    setShowTools(true);
     
     if (onTabChange) {
       onTabChange(newMode);
     }
     
-    // Clear opposite mode's state
     if (newMode === 'dsp') {
       setSpeechResult(null);
       setMusicResult(null);
@@ -142,8 +156,6 @@ export default function CustomizedModePanel({
     if (newType === contentType) return;
     
     setContentType(newType);
-    
-    // Clear AI results when switching content type
     setSpeechResult(null);
     setMusicResult(null);
     setSourceGains({});
@@ -274,7 +286,6 @@ export default function CustomizedModePanel({
     setSourceGains(prev => {
       const updated = { ...prev, [sourceKey]: gain };
       
-      // Remix audio immediately
       if ((speechResult || musicResult) && Object.keys(sourceBuffers).length > 0 && onAudioMixed) {
         try {
           const mixed = mixSources(sourceBuffers, updated, audioContext);
@@ -284,7 +295,6 @@ export default function CustomizedModePanel({
         }
       }
       
-      // Update cache
       if (onAICacheUpdate && (speechResult || musicResult) && Object.keys(sourceBuffers).length > 0) {
         const result = speechResult || musicResult;
         const modelType = speechResult ? 'dprnn' : 'demucs';
@@ -299,13 +309,11 @@ export default function CustomizedModePanel({
     const buffer = sourceBuffers[sourceKey];
     if (!buffer) return;
     
-    // If same source is playing, stop it
     if (playingSource === sourceKey) {
       stopPlayback();
       return;
     }
     
-    // Stop current playback and play new source
     stopPlayback();
     
     const sourceNode = audioContext.createBufferSource();
@@ -419,13 +427,10 @@ export default function CustomizedModePanel({
   };
 
   const getSourceLabel = (sourceId: string): string => {
-    // Speech sources: source_0, source_1, etc.
     if (sourceId.startsWith('source_')) {
       const index = parseInt(sourceId.split('_')[1]);
-      return `Speaker ${index + 1}`; // Convert 0-indexed to 1-indexed for display
+      return `Speaker ${index + 1}`;
     }
-    
-    // Music sources: drums, bass, vocals, other
     return sourceId.charAt(0).toUpperCase() + sourceId.slice(1);
   };
 
@@ -459,69 +464,129 @@ export default function CustomizedModePanel({
   // ===== Render =====
   
   return (
-    <div className="customized-mode-panel">
-      {/* Mode Toggle */}
-      <ModeToggle
-        processingMode={processingMode}
-        onChange={handleModeSwitch}
-        disabled={disabled || aiProcessing}
-      />
+    <div className="customized-mode-panel compact">
+      {/* Compact Option Selection Row */}
+      <div className="expert-options-row">
+        {/* Processing Type Pills */}
+        <div className="option-group">
+          <span className="option-label">Mode:</span>
+          <div className="option-pills">
+            <button 
+              className={`option-pill ${processingMode === 'dsp' ? 'active' : ''}`}
+              onClick={() => handleModeSwitch('dsp')}
+              disabled={disabled || aiProcessing}
+            >
+              🎛️ DSP
+            </button>
+            <button 
+              className={`option-pill ai ${processingMode === 'ai' ? 'active' : ''}`}
+              onClick={() => handleModeSwitch('ai')}
+              disabled={disabled || aiProcessing}
+            >
+              🤖 AI
+            </button>
+          </div>
+        </div>
 
-      {/* Content Type Selector (AI mode only) */}
-      {processingMode === 'ai' && (
-        <ContentTypeSelector
-          contentType={contentType}
-          onChange={handleContentTypeChange}
-          disabled={disabled || aiProcessing}
-        />
-      )}
+        {/* Content Type Pills - contextual based on mode */}
+        <div className="option-group">
+          <span className="option-label">
+            {processingMode === 'ai' ? 'Content:' : 'Target:'}
+          </span>
+          <div className="option-pills">
+            {processingMode === 'ai' ? (
+              <>
+                <button 
+                  className={`option-pill ${contentType === 'speech' ? 'active' : ''}`}
+                  onClick={() => handleContentTypeChange('speech')}
+                  disabled={disabled || aiProcessing}
+                >
+                  🗣️ Speech
+                </button>
+                <button 
+                  className={`option-pill ${contentType === 'music' ? 'active' : ''}`}
+                  onClick={() => handleContentTypeChange('music')}
+                  disabled={disabled || aiProcessing}
+                >
+                  🎵 Music
+                </button>
+              </>
+            ) : (
+              <>
+                <button 
+                  className={`option-pill ${dspContentType === 'instruments' ? 'active' : ''}`}
+                  onClick={() => setDspContentType('instruments')}
+                  disabled={disabled}
+                >
+                  🎸 Instruments
+                </button>
+                <button 
+                  className={`option-pill ${dspContentType === 'voices' ? 'active' : ''}`}
+                  onClick={() => setDspContentType('voices')}
+                  disabled={disabled}
+                >
+                  🎤 Voices
+                </button>
+              </>
+            )}
+          </div>
+        </div>
 
-      {/* DSP Controls */}
-      {processingMode === 'dsp' && (
-        <DSPControls
-          onBandSpecsChange={onBandSpecsChange}
-          disabled={disabled}
-        />
-      )}
+        {/* Tools Toggle */}
+        <button 
+          className={`tools-toggle ${showTools ? 'expanded' : ''}`}
+          onClick={() => setShowTools(!showTools)}
+        >
+          {showTools ? '▼' : '▶'} Tools
+        </button>
+      </div>
 
-      {/* AI Controls */}
-      {processingMode === 'ai' && (
-        <>
-          <AIControls
-            contentType={contentType}
-            audioFile={audioFile}
-            onProcess={handleProcessAudio}
-            onDemo={handleProcessDemo}
-            processing={aiProcessing}
-            disabled={disabled}
-            hasResults={!!(speechResult || musicResult)}
-            cacheInfo={aiCache}
-          />
-
-          {/* Source List */}
-          {(speechResult || musicResult) && (
-            <SourceList
-              sourceIds={getSourceIds()}
-              getLabel={getSourceLabel}
-              sourceGains={sourceGains}
-              playingSource={playingSource}
-              soloedSources={soloedSources}
-              mutedSources={mutedSources}
-              onPlayToggle={handlePlayToggle}
-              onSoloToggle={handleSoloToggle}
-              onMuteToggle={handleMuteToggle}
-              onGainChange={handleSourceGainChange}
-              spectrogramUrls={getSpectrogramUrls()}
-              audioShapes={getAudioShapes()}
+      {/* Collapsible Tools Section */}
+      {showTools && (
+        <div className="expert-tools-section">
+          {processingMode === 'dsp' ? (
+            <DSPControls
+              onBandSpecsChange={onBandSpecsChange}
               disabled={disabled}
             />
+          ) : (
+            <>
+              <AIControls
+                contentType={contentType}
+                audioFile={audioFile}
+                onProcess={handleProcessAudio}
+                onDemo={handleProcessDemo}
+                processing={aiProcessing}
+                disabled={disabled}
+                hasResults={!!(speechResult || musicResult)}
+                cacheInfo={aiCache}
+              />
+
+              {(speechResult || musicResult) && (
+                <SourceList
+                  sourceIds={getSourceIds()}
+                  getLabel={getSourceLabel}
+                  sourceGains={sourceGains}
+                  playingSource={playingSource}
+                  soloedSources={soloedSources}
+                  mutedSources={mutedSources}
+                  onPlayToggle={handlePlayToggle}
+                  onSoloToggle={handleSoloToggle}
+                  onMuteToggle={handleMuteToggle}
+                  onGainChange={handleSourceGainChange}
+                  spectrogramUrls={getSpectrogramUrls()}
+                  audioShapes={getAudioShapes()}
+                  disabled={disabled}
+                />
+              )}
+            </>
           )}
-        </>
+        </div>
       )}
 
       {/* Error Display */}
       {error && (
-        <div className="error-message">
+        <div className="error-message compact">
           <p>{error}</p>
         </div>
       )}

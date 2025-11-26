@@ -430,55 +430,58 @@ function App() {
                 />
               </section>
 
-              {/* DUAL SPECTROGRAM - Input & Output with Toggle */}
-              <section className="eq-spectrum-section">
+              {/* DUAL SPECTROGRAM - Input & Output with Toggle - MORE VERTICAL SPACE */}
+              <section className="eq-spectrum-section eq-spectrum-section--expanded">
                 <DualSpectrogram
                   inputBuffer={originalBuffer}
                   outputBuffer={processedBuffer}
                   visible={showSpectrograms}
                   onVisibilityChange={setShowSpectrograms}
-                  height={180}
+                  height={240}
                 />
               </section>
 
-              {/* Waveform Section - Linked Cine Viewers */}
-              <section className="eq-waveform-section glass-panel">
-                <LinkedWaveformViewers
-                  inputBuffer={originalBuffer}
-                  outputBuffer={processedBuffer}
-                  currentTime={playbackState.currentTime}
-                />
-              </section>
-
-              {/* Mode Controls - Compact Horizontal Layout */}
-              <section className="eq-controls-section glass-panel">
-                {appMode === 'generic' && (
-                  <GenericMode
-                    onBandsChange={handleGenericBandsChange}
-                    sampleRate={originalBuffer!.sampleRate}
-                    disabled={isProcessing}
+              {/* COMBINED ROW: Waveform Viewers + Controls Side by Side */}
+              <section className="eq-combined-row">
+                {/* Left: Linked Waveform Viewers */}
+                <div className="eq-waveform-compact glass-panel">
+                  <LinkedWaveformViewers
+                    inputBuffer={originalBuffer}
+                    outputBuffer={processedBuffer}
+                    currentTime={playbackState.currentTime}
                   />
-                )}
+                </div>
 
-                {appMode === 'custom' && (
-                  <CustomizedModePanel
-                    onBandSpecsChange={handleCustomModeBandSpecsChange}
-                    disabled={isProcessing}
-                    audioFile={audioFile}
-                    onAudioMixed={handleAIMixedAudio}
-                    aiCache={aiSeparationCache}
-                    onAICacheUpdate={handleAICacheUpdate}
-                    activeTab={customModeTab}
-                    onTabChange={handleCustomModeTabChange}
-                  />
-                )}
+                {/* Right: Mode Controls */}
+                <div className="eq-controls-compact glass-panel">
+                  {appMode === 'generic' && (
+                    <GenericMode
+                      onBandsChange={handleGenericBandsChange}
+                      sampleRate={originalBuffer!.sampleRate}
+                      disabled={isProcessing}
+                    />
+                  )}
 
-                {isProcessing && (
-                  <div className="eq-processing-overlay">
-                    <div className="eq-processing-spinner" />
-                    <span>Processing audio…</span>
-                  </div>
-                )}
+                  {appMode === 'custom' && (
+                    <CustomizedModePanel
+                      onBandSpecsChange={handleCustomModeBandSpecsChange}
+                      disabled={isProcessing}
+                      audioFile={audioFile}
+                      onAudioMixed={handleAIMixedAudio}
+                      aiCache={aiSeparationCache}
+                      onAICacheUpdate={handleAICacheUpdate}
+                      activeTab={customModeTab}
+                      onTabChange={handleCustomModeTabChange}
+                    />
+                  )}
+
+                  {isProcessing && (
+                    <div className="eq-processing-overlay">
+                      <div className="eq-processing-spinner" />
+                      <span>Processing…</span>
+                    </div>
+                  )}
+                </div>
               </section>
             </>
           )}

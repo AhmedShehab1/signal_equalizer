@@ -1,6 +1,6 @@
 /**
- * CustomizedMode Panel Styles - Enhanced Glass-morphic Design
- * Professional UI/UX for Advanced (DSP) and Expert (AI) tabs
+ * CustomizedMode Panel Styles - Compact Expert Mode Design
+ * Option-based selection with collapsible tools
  */
 
 /* ===== MAIN CONTAINER ===== */
@@ -11,7 +11,124 @@
   min-height: 400px;
 }
 
-/* ===== MODE TOGGLE (DSP vs AI) ===== */
+.customized-mode-panel.compact {
+  gap: 12px;
+  min-height: auto;
+}
+
+/* ===== EXPERT OPTIONS ROW (Compact) ===== */
+.expert-options-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 14px;
+  background: rgba(20, 22, 30, 0.85);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  flex-wrap: wrap;
+}
+
+.option-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.option-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.option-pills {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 8px;
+}
+
+.option-pill {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.option-pill:hover:not(:disabled):not(.active) {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.option-pill.active {
+  background: linear-gradient(135deg, rgba(0, 245, 255, 0.25), rgba(0, 180, 220, 0.15));
+  color: var(--color-accent, #00f5ff);
+  box-shadow: 0 2px 8px rgba(0, 245, 255, 0.15);
+}
+
+.option-pill.ai.active {
+  background: linear-gradient(135deg, rgba(255, 0, 128, 0.2), rgba(180, 0, 100, 0.15));
+  color: #ff0080;
+  box-shadow: 0 2px 8px rgba(255, 0, 128, 0.15);
+}
+
+.option-pill:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.tools-toggle {
+  margin-left: auto;
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tools-toggle:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.tools-toggle.expanded {
+  color: var(--color-accent, #00f5ff);
+  border-color: rgba(0, 245, 255, 0.3);
+}
+
+/* ===== EXPERT TOOLS SECTION ===== */
+.expert-tools-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ===== MODE TOGGLE (DSP vs AI) - Legacy ===== */
 .mode-toggle-container {
   display: flex;
   align-items: center;
@@ -1368,3 +1485,325 @@
 .multi-window-slider:nth-child(3) { animation-delay: 0.15s; }
 .multi-window-slider:nth-child(4) { animation-delay: 0.2s; }
 .multi-window-slider:nth-child(5) { animation-delay: 0.25s; }
+
+/* ===== COMPACT MODE OVERRIDES ===== */
+
+/* Compact DSP Controls */
+.customized-mode-panel.compact .dsp-controls {
+  gap: 10px;
+}
+
+.customized-mode-panel.compact .dsp-info-banner {
+  display: none; /* Hide verbose info in compact mode */
+}
+
+.customized-mode-panel.compact .dsp-mode-header {
+  padding: 12px 16px;
+  gap: 12px;
+  border-radius: 10px;
+}
+
+.customized-mode-panel.compact .dsp-mode-title {
+  font-size: 1.1rem;
+  margin-bottom: 4px;
+  gap: 8px;
+}
+
+.customized-mode-panel.compact .dsp-mode-icon {
+  font-size: 1em;
+}
+
+.customized-mode-panel.compact .dsp-mode-description {
+  display: none; /* Hide in compact */
+}
+
+.customized-mode-panel.compact .dsp-mode-stats {
+  gap: 6px;
+}
+
+.customized-mode-panel.compact .stat-badge {
+  padding: 4px 8px;
+  font-size: 0.7rem;
+}
+
+.customized-mode-panel.compact .dsp-mode-actions {
+  flex-direction: row;
+  gap: 8px;
+}
+
+.customized-mode-panel.compact .mode-selector-wrapper {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+.customized-mode-panel.compact .mode-selector-label {
+  font-size: 0.7rem;
+}
+
+.customized-mode-panel.compact .mode-selector-dropdown {
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  min-width: 140px;
+}
+
+.customized-mode-panel.compact .dsp-reset-button {
+  padding: 6px 12px;
+  font-size: 0.75rem;
+}
+
+/* Compact Sliders - Horizontal Scroll */
+.customized-mode-panel.compact .sliders-grid {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 245, 255, 0.3) transparent;
+}
+
+.customized-mode-panel.compact .sliders-grid::-webkit-scrollbar {
+  height: 6px;
+}
+
+.customized-mode-panel.compact .sliders-grid::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.customized-mode-panel.compact .sliders-grid::-webkit-scrollbar-thumb {
+  background: rgba(0, 245, 255, 0.3);
+  border-radius: 3px;
+}
+
+.customized-mode-panel.compact .dsp-slider-card {
+  min-width: 160px;
+  max-width: 180px;
+  flex-shrink: 0;
+  padding: 12px;
+  gap: 8px;
+  border-radius: 10px;
+}
+
+.customized-mode-panel.compact .dsp-slider-header {
+  flex-direction: column;
+  gap: 6px;
+}
+
+.customized-mode-panel.compact .dsp-slider-title {
+  gap: 6px;
+}
+
+.customized-mode-panel.compact .dsp-slider-icon {
+  font-size: 1.1rem;
+}
+
+.customized-mode-panel.compact .dsp-slider-label {
+  font-size: 0.85rem;
+}
+
+.customized-mode-panel.compact .dsp-slider-meta {
+  width: 100%;
+  justify-content: space-between;
+}
+
+.customized-mode-panel.compact .dsp-windows-badge {
+  font-size: 0.6rem;
+  padding: 2px 6px;
+}
+
+.customized-mode-panel.compact .dsp-scale-value {
+  font-size: 0.9rem;
+}
+
+.customized-mode-panel.compact .dsp-freq-range {
+  padding: 4px 0;
+  gap: 6px;
+}
+
+.customized-mode-panel.compact .freq-min,
+.customized-mode-panel.compact .freq-max {
+  font-size: 0.65rem;
+}
+
+.customized-mode-panel.compact .freq-bar {
+  height: 4px;
+}
+
+.customized-mode-panel.compact .dsp-slider-control {
+  gap: 4px;
+}
+
+.customized-mode-panel.compact .dsp-range-input {
+  height: 8px;
+}
+
+.customized-mode-panel.compact .dsp-range-input::-webkit-slider-thumb {
+  width: 18px;
+  height: 18px;
+}
+
+.customized-mode-panel.compact .dsp-slider-ticks {
+  display: none; /* Hide in compact */
+}
+
+.customized-mode-panel.compact .dsp-slider-presets {
+  gap: 3px;
+  padding-top: 6px;
+}
+
+.customized-mode-panel.compact .preset-btn {
+  padding: 4px 2px;
+  font-size: 0.65rem;
+}
+
+.customized-mode-panel.compact .dsp-quick-actions {
+  display: none; /* Hide quick actions in compact */
+}
+
+/* Compact AI Controls */
+.customized-mode-panel.compact .ai-controls-container {
+  padding: 14px;
+  gap: 12px;
+  border-radius: 12px;
+}
+
+.customized-mode-panel.compact .ai-info-section {
+  padding: 10px 12px;
+  border-radius: 8px;
+}
+
+.customized-mode-panel.compact .ai-description {
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.customized-mode-panel.compact .ai-actions {
+  gap: 8px;
+}
+
+.customized-mode-panel.compact .process-button,
+.customized-mode-panel.compact .demo-button {
+  padding: 10px 16px;
+  font-size: 0.85rem;
+  border-radius: 10px;
+}
+
+.customized-mode-panel.compact .ai-messages .info-message,
+.customized-mode-panel.compact .ai-messages .cache-info,
+.customized-mode-panel.compact .ai-messages .cache-timestamp {
+  font-size: 0.75rem;
+  padding: 6px 10px;
+}
+
+/* Compact Source List - Horizontal */
+.customized-mode-panel.compact .source-list {
+  gap: 10px;
+}
+
+.customized-mode-panel.compact .source-list-header {
+  padding: 10px 14px;
+  border-radius: 10px;
+}
+
+.customized-mode-panel.compact .source-list-header h3 {
+  font-size: 0.95rem;
+  gap: 8px;
+}
+
+.customized-mode-panel.compact .stop-all-button {
+  padding: 5px 10px;
+  font-size: 0.75rem;
+}
+
+.customized-mode-panel.compact .sources-container {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 0, 128, 0.3) transparent;
+}
+
+.customized-mode-panel.compact .sources-container::-webkit-scrollbar {
+  height: 6px;
+}
+
+.customized-mode-panel.compact .sources-container::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.customized-mode-panel.compact .sources-container::-webkit-scrollbar-thumb {
+  background: rgba(255, 0, 128, 0.3);
+  border-radius: 3px;
+}
+
+.customized-mode-panel.compact .source-card {
+  min-width: 180px;
+  max-width: 200px;
+  flex-shrink: 0;
+  padding: 12px;
+  gap: 10px;
+  border-radius: 12px;
+}
+
+.customized-mode-panel.compact .source-header {
+  gap: 8px;
+}
+
+.customized-mode-panel.compact .source-label {
+  font-size: 0.95rem;
+}
+
+.customized-mode-panel.compact .source-actions {
+  gap: 4px;
+}
+
+.customized-mode-panel.compact .play-button,
+.customized-mode-panel.compact .solo-button,
+.customized-mode-panel.compact .mute-button {
+  padding: 4px 8px;
+  font-size: 0.7rem;
+}
+
+.customized-mode-panel.compact .source-actions .gain-value {
+  font-size: 0.8rem;
+  min-width: 45px;
+}
+
+.customized-mode-panel.compact .gain-slider {
+  height: 4px;
+}
+
+.customized-mode-panel.compact .gain-slider::-webkit-slider-thumb {
+  width: 14px;
+  height: 14px;
+}
+
+.customized-mode-panel.compact .source-info {
+  gap: 6px;
+}
+
+.customized-mode-panel.compact .source-shape {
+  font-size: 0.65rem;
+  padding: 2px 6px;
+}
+
+.customized-mode-panel.compact .source-spectrogram {
+  display: none; /* Hide spectrograms in compact mode */
+}
+
+/* Compact Error Message */
+.error-message.compact {
+  padding: 10px 14px;
+  border-radius: 8px;
+}
+
+.error-message.compact p {
+  font-size: 0.8rem;
+}
