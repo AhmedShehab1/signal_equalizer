@@ -1,0 +1,230 @@
+/**
+ * SpectrumChart Styles - Glass-morphic Design
+ * Matches the overall EQ-inspired aesthetic
+ */
+
+.spectrum-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  border-radius: 16px;
+  background: rgba(20, 20, 30, 0.85);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: all 0.3s ease;
+}
+
+.spectrum-chart:hover {
+  border-color: rgba(0, 245, 255, 0.2);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    0 0 20px rgba(0, 245, 255, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* Header */
+.spectrum-chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.spectrum-chart-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #ffffff;
+  letter-spacing: 0.02em;
+}
+
+.title-icon {
+  font-size: 1.2em;
+}
+
+/* Scale Toggle */
+.scale-toggle-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.scale-label {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 500;
+}
+
+.scale-toggle {
+  display: flex;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  padding: 3px;
+  gap: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.scale-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.scale-btn:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.scale-btn.active {
+  background: linear-gradient(135deg, rgba(0, 245, 255, 0.3), rgba(0, 150, 200, 0.2));
+  color: var(--color-accent, #00f5ff);
+  box-shadow: 
+    0 2px 8px rgba(0, 245, 255, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.scale-icon {
+  font-size: 1em;
+}
+
+/* Chart Body */
+.spectrum-chart-body {
+  position: relative;
+  width: 100%;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Footer */
+.spectrum-chart-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.scale-info {
+  flex: 1;
+}
+
+.info-text {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.5);
+  font-style: italic;
+}
+
+.sample-rate-info {
+  display: flex;
+  align-items: center;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.badge-secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Animation for scale transition */
+@keyframes scaleTransition {
+  0% {
+    opacity: 0.5;
+    transform: scaleY(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+.spectrum-chart-body canvas {
+  animation: scaleTransition 0.3s ease-out;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .spectrum-chart {
+    padding: 16px;
+  }
+  
+  .spectrum-chart-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .scale-toggle-container {
+    width: 100%;
+  }
+  
+  .scale-toggle {
+    flex: 1;
+  }
+  
+  .scale-btn {
+    flex: 1;
+    justify-content: center;
+    padding: 10px 12px;
+  }
+  
+  .spectrum-chart-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* Hover effects for interactivity */
+.spectrum-chart-body:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+/* Focus states for accessibility */
+.scale-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(0, 245, 255, 0.5);
+}
+
+.scale-btn:focus:not(:focus-visible) {
+  box-shadow: none;
+}
+
+.scale-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(0, 245, 255, 0.5);
+}
+
+/* Dark mode chart customization hints */
+.spectrum-chart canvas {
+  filter: drop-shadow(0 0 8px rgba(0, 245, 255, 0.15));
+}
