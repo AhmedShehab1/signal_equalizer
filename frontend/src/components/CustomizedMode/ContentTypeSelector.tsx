@@ -16,6 +16,7 @@
  */
 
 import type { ContentTypeSelectorProps } from './types';
+import './CustomizedMode.css';
 
 export function ContentTypeSelector({ 
   contentType, 

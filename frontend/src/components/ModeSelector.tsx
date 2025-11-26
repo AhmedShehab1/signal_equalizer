@@ -12,19 +12,17 @@ interface ModeSelectorProps {
 
 export default function ModeSelector({ modes, currentMode, onModeSelect }: ModeSelectorProps) {
   return (
-    <div className="mode-selector">
-      <h3>Equalizer Modes</h3>
+    <div className="mode-selector glass-panel">
+      <h3>🎛️ Equalizer Modes</h3>
       <div className="mode-buttons">
         {modes.map(mode => (
           <button
             key={mode.name}
             onClick={() => onModeSelect(mode.name)}
-            className={currentMode === mode.name ? 'active' : ''}
-            style={{
-              backgroundColor: currentMode === mode.name ? '#646cff' : '#1a1a1a',
-            }}
+            className={`btn ${currentMode === mode.name ? 'btn-accent' : 'btn-ghost'}`}
           >
             {mode.name}
+            {currentMode === mode.name && <span className="badge badge-success" style={{marginLeft: '8px'}}>Active</span>}
           </button>
         ))}
       </div>
