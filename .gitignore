@@ -21,6 +21,7 @@ backend/htmlcov/
 backend/*.cover
 backend/*.egg-info/
 backend/.env
+backend/lighting_logs/*
 
 # Logs
 logs
@@ -55,3 +56,4 @@ tmp/
 
 *.mp3
 *.wav
+
