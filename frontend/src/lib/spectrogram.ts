@@ -13,13 +13,13 @@ import { SpectrogramData, BandSpec } from '../model/types';
  * @param hopSize - Hop size between windows
  * @returns Spectrogram data
  */
-export function generateSpectrogram(
+export async function generateSpectrogram(
   signal: number[],
   sampleRate: number,
   windowSize: number = 2048,
   hopSize: number = 512
-): SpectrogramData {
-  const stftResult = stft(signal, windowSize, hopSize, sampleRate);
+): Promise<SpectrogramData> {
+  const stftResult = await stft(signal, windowSize, hopSize, sampleRate);
   
   // Convert magnitudes to dB scale
   const dataDb = stftResult.magnitudes.map(frame =>
