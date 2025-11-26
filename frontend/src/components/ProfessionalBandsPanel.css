@@ -1,0 +1,368 @@
+/**
+ * Professional Bands Panel Styling
+ * Vertical fader design inspired by professional EQ plugins
+ */
+
+.professional-bands-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: var(--spacing-4);
+  overflow-y: auto;
+}
+
+.bands-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-4);
+  padding-bottom: var(--spacing-3);
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.bands-panel-header h3 {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  color: var(--color-text-primary);
+}
+
+/* Bands grid - horizontal scrolling on overflow */
+.bands-grid {
+  display: flex;
+  gap: var(--spacing-3);
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: visible;
+  padding: var(--spacing-2) 0;
+}
+
+/* Individual band column */
+.band-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-3);
+  min-width: 100px;
+  padding: var(--spacing-3);
+  background: var(--glass-bg-light);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  transition: all var(--transition-normal);
+}
+
+.band-column:hover {
+  background: var(--glass-bg-medium);
+  border-color: var(--color-primary);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Top controls (band type, enable) */
+.band-controls-top {
+  display: flex;
+  gap: var(--spacing-1);
+  width: 100%;
+  justify-content: space-between;
+}
+
+.band-type-btn,
+.band-enable-btn {
+  font-size: 16px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+}
+
+.band-enable-btn {
+  color: var(--color-success);
+}
+
+/* Frequency display */
+.band-frequency {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 8px currentColor;
+  margin-bottom: var(--spacing-2);
+}
+
+/* Vertical fader container */
+.vertical-fader-container {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  min-height: 200px;
+  display: flex;
+  justify-content: center;
+}
+
+.fader-track {
+  position: relative;
+  width: 40px;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Fader markers (dB scale) */
+.fader-markers {
+  position: absolute;
+  left: -30px;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.fader-mark {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.fader-mark.center {
+  color: var(--color-accent);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Center line (0dB reference) */
+.fader-center-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2px;
+  background: var(--color-accent);
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+/* Fill indicator */
+.fader-fill {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 8px;
+  border-radius: var(--radius-full);
+  pointer-events: none;
+  transition: all var(--transition-fast);
+  box-shadow: 0 0 12px currentColor;
+}
+
+/* Vertical slider */
+.vertical-fader {
+  -webkit-appearance: slider-vertical;
+  appearance: slider-vertical;
+  width: 8px;
+  height: 100%;
+  background: var(--color-gray-800);
+  border-radius: var(--radius-full);
+  outline: none;
+  cursor: ns-resize;
+  z-index: 2;
+  position: relative;
+}
+
+.vertical-fader::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  background: var(--thumb-color, var(--color-primary));
+  border: 3px solid var(--color-background);
+  border-radius: 50%;
+  cursor: ns-resize;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), 0 0 12px var(--thumb-color, var(--color-primary));
+  transition: all var(--transition-fast);
+}
+
+.vertical-fader::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), 0 0 16px var(--thumb-color, var(--color-primary));
+}
+
+.vertical-fader::-webkit-slider-thumb:active {
+  transform: scale(1.05);
+}
+
+.vertical-fader::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  background: var(--thumb-color, var(--color-primary));
+  border: 3px solid var(--color-background);
+  border-radius: 50%;
+  cursor: ns-resize;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), 0 0 12px var(--thumb-color, var(--color-primary));
+  transition: all var(--transition-fast);
+}
+
+.vertical-fader::-moz-range-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), 0 0 16px var(--thumb-color, var(--color-primary));
+}
+
+.vertical-fader::-moz-range-thumb:active {
+  transform: scale(1.05);
+}
+
+.vertical-fader:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Gain value display */
+.band-gain-value {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+  padding: var(--spacing-1) var(--spacing-2);
+  background: var(--glass-bg-heavy);
+  border-radius: var(--radius-md);
+  min-width: 65px;
+  text-align: center;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.band-gain-value.positive {
+  text-shadow: 0 0 8px currentColor;
+}
+
+.band-gain-value.negative {
+  opacity: 0.9;
+}
+
+/* Rotary control (Q factor) */
+.rotary-control {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-1);
+  margin: var(--spacing-2) 0;
+}
+
+.rotary-svg {
+  width: 60px;
+  height: 60px;
+  cursor: pointer;
+  transition: transform var(--transition-fast);
+}
+
+.rotary-svg:hover {
+  transform: scale(1.05);
+}
+
+.rotary-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+.rotary-value {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Band label */
+.band-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  text-align: center;
+  margin-top: auto;
+}
+
+/* Bottom controls */
+.band-controls-bottom {
+  display: flex;
+  gap: var(--spacing-1);
+  width: 100%;
+  justify-content: space-between;
+  padding-top: var(--spacing-2);
+  border-top: 1px solid var(--glass-border);
+}
+
+.band-controls-bottom .btn {
+  font-size: 14px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+}
+
+/* Add band column */
+.add-band-column {
+  min-width: 80px;
+  justify-content: center;
+  background: var(--glass-bg-light);
+  border: 2px dashed var(--glass-border);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.add-band-column:hover {
+  background: var(--glass-bg-medium);
+  border-color: var(--color-accent);
+  transform: none;
+}
+
+.add-band-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-2);
+  width: 100%;
+  height: 100%;
+  padding: var(--spacing-4);
+}
+
+.add-icon {
+  font-size: 32px;
+  color: var(--color-accent);
+}
+
+.add-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+/* Responsive design */
+@media (max-width: 1280px) {
+  .band-column {
+    min-width: 90px;
+  }
+  
+  .vertical-fader-container {
+    min-height: 180px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .bands-grid {
+    flex-wrap: wrap;
+  }
+  
+  .band-column {
+    min-width: 85px;
+  }
+}
+
+/* Scrollbar styling for bands grid */
+.bands-grid::-webkit-scrollbar {
+  height: 8px;
+}
+
+.bands-grid::-webkit-scrollbar-track {
+  background: var(--glass-bg-light);
+  border-radius: var(--radius-full);
+}
+
+.bands-grid::-webkit-scrollbar-thumb {
+  background: var(--color-gray-600);
+  border-radius: var(--radius-full);
+}
+
+.bands-grid::-webkit-scrollbar-thumb:hover {
+  background: var(--color-gray-500);
+}
