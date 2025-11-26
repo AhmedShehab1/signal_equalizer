@@ -26,6 +26,7 @@
 
 import { SourceCard } from './SourceCard';
 import type { SourceListProps } from './types';
+import './CustomizedMode.css';
 
 export function SourceList({
   sourceIds,

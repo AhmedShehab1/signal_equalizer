@@ -25,6 +25,22 @@
  */
 
 import type { SourceCardProps } from './types';
+import './CustomizedMode.css';
+
+// Helper function to get icon for source type
+function getSourceIcon(sourceId: string): string {
+  const iconMap: Record<string, string> = {
+    drums: '🥁',
+    bass: '🎸',
+    vocals: '🎤',
+    other: '🎹',
+    speaker_1: '👤',
+    speaker_2: '👥',
+    background: '🔈',
+    speech: '🗣️',
+  };
+  return iconMap[sourceId.toLowerCase()] || '🎵';
+}
 
 export function SourceCard({
   sourceId,
@@ -47,7 +63,7 @@ export function SourceCard({
       {/* Source Header */}
       <div className="source-header">
         <label htmlFor={`gain-${sourceId}`} className="source-label">
-          {label}
+          {getSourceIcon(sourceId)} {label}
         </label>
         
         {/* Action Buttons */}
@@ -59,7 +75,7 @@ export function SourceCard({
             title={isPlaying ? 'Stop playback' : 'Play source'}
             aria-label={isPlaying ? `Stop playing ${label}` : `Play ${label}`}
           >
-            {isPlaying ? '⏸ Playing' : '▶ Play'}
+            {isPlaying ? '⏸️ Playing' : '▶️ Play'}
           </button>
           
           <button
@@ -70,7 +86,7 @@ export function SourceCard({
             aria-label={isSoloed ? `Unsolo ${label}` : `Solo ${label}`}
             aria-pressed={isSoloed}
           >
-            🎵 Solo
+            🎯 Solo
           </button>
           
           <button
