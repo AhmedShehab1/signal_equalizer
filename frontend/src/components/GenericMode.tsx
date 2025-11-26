@@ -4,6 +4,7 @@
 
 import { useState } from 'react';
 import { BandSpec } from '../model/types';
+import './GenericMode.css';
 
 interface GenericBand {
   id: string;
@@ -18,10 +19,41 @@ interface GenericModeProps {
   disabled?: boolean;
 }
 
+// Get icon based on frequency range
+const getBandIcon = (startHz: number, endHz: number): string => {
+  const midFreq = (startHz + endHz) / 2;
+  if (midFreq < 100) return '🎵'; // Sub-bass
+  if (midFreq < 300) return '🔊'; // Bass
+  if (midFreq < 1000) return '🎸'; // Low mids
+  if (midFreq < 4000) return '🎹'; // Mids
+  if (midFreq < 8000) return '🎤'; // Upper mids
+  return '✨'; // Highs/Air
+};
+
+// Get color based on gain
+const getGainColor = (scale: number): string => {
+  if (scale < 0.3) return '#ff4757'; // Muted - red
+  if (scale < 0.7) return '#ffa502'; // Reduced - orange
+  if (scale < 1.3) return '#2ed573'; // Unity - green
+  if (scale < 1.7) return '#1e90ff'; // Boosted - blue
+  return '#a55eea'; // Max boost - purple
+};
+
+// Get status label
+const getGainStatus = (scale: number): { label: string; className: string } => {
+  if (scale < 0.1) return { label: 'MUTED', className: 'muted' };
+  if (scale < 0.5) return { label: 'CUT', className: 'cut' };
+  if (scale < 0.95) return { label: 'REDUCED', className: 'reduced' };
+  if (scale <= 1.05) return { label: 'UNITY', className: 'unity' };
+  if (scale < 1.5) return { label: 'BOOST', className: 'boost' };
+  return { label: 'MAX', className: 'max' };
+};
+
 export default function GenericMode({ onBandsChange, sampleRate, disabled = false }: GenericModeProps) {
   const [bands, setBands] = useState<GenericBand[]>([
     { id: '1', startHz: 20, endHz: 200, scale: 1.0 },
   ]);
+  const [expandedBand, setExpandedBand] = useState<string | null>(null);
 
   const nyquist = sampleRate / 2;
 
@@ -186,121 +218,333 @@ export default function GenericMode({ onBandsChange, sampleRate, disabled = fals
 
   return (
     <div className="generic-mode">
+      {/* Header Section */}
       <div className="generic-mode-header">
-        <h2>Generic Mode (User-defined Subdivisions)</h2>
-        <div className="generic-mode-actions">
-          <button onClick={addBand} disabled={disabled}>
-            + Add Band
-          </button>
-          <button onClick={exportScheme} disabled={disabled || bands.length === 0}>
-            Export Scheme
-          </button>
-          <label className="import-button">
-            Import Scheme
-            <input
-              type="file"
-              accept=".json"
-              onChange={importScheme}
+        <div className="header-left">
+          <div className="header-title">
+            <span className="header-icon">🎛️</span>
+            <h2>Custom Band Editor</h2>
+          </div>
+          <p className="header-description">
+            Define custom frequency bands with precise control over gain. Perfect for surgical EQ adjustments.
+          </p>
+        </div>
+        
+        <div className="header-right">
+          <div className="band-count">
+            <span className="count-number">{bands.length}</span>
+            <span className="count-label">Active Bands</span>
+          </div>
+          
+          <div className="header-actions">
+            <button 
+              className="action-btn primary" 
+              onClick={addBand} 
               disabled={disabled}
-              style={{ display: 'none' }}
-            />
-          </label>
+            >
+              <span className="btn-icon">➕</span>
+              <span className="btn-text">Add Band</span>
+            </button>
+            <button 
+              className="action-btn secondary" 
+              onClick={exportScheme} 
+              disabled={disabled || bands.length === 0}
+            >
+              <span className="btn-icon">💾</span>
+              <span className="btn-text">Export</span>
+            </button>
+            <label className="action-btn secondary import-label">
+              <span className="btn-icon">📂</span>
+              <span className="btn-text">Import</span>
+              <input
+                type="file"
+                accept=".json"
+                onChange={importScheme}
+                disabled={disabled}
+                style={{ display: 'none' }}
+              />
+            </label>
+          </div>
         </div>
       </div>
 
-      <div className="generic-bands-list">
-        {bands.map((band, index) => (
-          <fieldset 
-            key={band.id} 
-            className="generic-band"
-            disabled={disabled}
-            style={{ border: '1px solid #333', borderRadius: '8px' }}
-          >
-            <div className="band-header">
-              <h4>Band {index + 1}</h4>
-              <button
-                onClick={() => deleteBand(band.id)}
-                disabled={bands.length === 1}
-                className="delete-button"
-                aria-label={`Delete band ${index + 1}`}
+      {/* Info Banner */}
+      <div className="info-banner">
+        <span className="info-icon">💡</span>
+        <p>
+          <strong>Tip:</strong> Click on a band card to expand frequency controls. 
+          Use the slider to adjust gain from 0× (mute) to 2× (double).
+        </p>
+      </div>
+
+      {/* Bands Grid */}
+      <div className="bands-grid">
+        {bands.map((band, index) => {
+          const isExpanded = expandedBand === band.id;
+          const gainStatus = getGainStatus(band.scale);
+          const bandIcon = getBandIcon(band.startHz, band.endHz);
+          const gainColor = getGainColor(band.scale);
+          const freqWidth = ((band.endHz - band.startHz) / nyquist) * 100;
+          const freqStart = (band.startHz / nyquist) * 100;
+          
+          return (
+            <div 
+              key={band.id} 
+              className={`band-card ${gainStatus.className} ${isExpanded ? 'expanded' : ''} ${disabled ? 'disabled' : ''}`}
+            >
+              {/* Band Header */}
+              <div 
+                className="band-card-header"
+                onClick={() => setExpandedBand(isExpanded ? null : band.id)}
               >
-                ✕
-              </button>
-            </div>
-
-            <div className="band-controls">
-              <div className="control-group">
-                <label htmlFor={`start-${band.id}`}>
-                  Start Frequency (Hz)
-                  <input
-                    id={`start-${band.id}`}
-                    type="number"
-                    min="0"
-                    max={nyquist}
-                    step="1"
-                    value={band.startHz}
-                    onChange={(e) => updateBand(band.id, 'startHz', parseFloat(e.target.value) || 0)}
-                    aria-label={`Start frequency for band ${index + 1}`}
-                    aria-describedby={`start-hint-${band.id}`}
-                  />
-                  <small id={`start-hint-${band.id}`} className="input-hint">
-                    Range: 0 - {Math.round(nyquist)} Hz
-                  </small>
-                </label>
-              </div>
-
-              <div className="control-group">
-                <label htmlFor={`end-${band.id}`}>
-                  End Frequency (Hz)
-                  <input
-                    id={`end-${band.id}`}
-                    type="number"
-                    min="0"
-                    max={nyquist}
-                    step="1"
-                    value={band.endHz}
-                    onChange={(e) => updateBand(band.id, 'endHz', parseFloat(e.target.value) || 0)}
-                    aria-label={`End frequency for band ${index + 1}`}
-                    aria-describedby={`end-hint-${band.id}`}
-                  />
-                  <small id={`end-hint-${band.id}`} className="input-hint">
-                    Range: 0 - {Math.round(nyquist)} Hz
-                  </small>
-                </label>
-              </div>
-
-              <div className="control-group scale-control">
-                <label htmlFor={`scale-${band.id}`}>
-                  Gain Scale (Linear)
-                  <div className="slider-container">
-                    <input
-                      id={`scale-${band.id}`}
-                      type="range"
-                      min="0"
-                      max="2"
-                      step="0.01"
-                      value={band.scale}
-                      onChange={(e) => updateBand(band.id, 'scale', parseFloat(e.target.value))}
-                      aria-label={`Gain scale for band ${index + 1}`}
-                      aria-valuemin={0}
-                      aria-valuemax={2}
-                      aria-valuenow={band.scale}
-                      aria-valuetext={`${band.scale.toFixed(2)} times`}
-                    />
-                    <span className="scale-value" aria-live="polite">
-                      {band.scale.toFixed(2)}×
+                <div className="band-identity">
+                  <span className="band-icon">{bandIcon}</span>
+                  <div className="band-info">
+                    <h4 className="band-name">Band {index + 1}</h4>
+                    <span className="band-range">
+                      {band.startHz.toLocaleString()} – {band.endHz.toLocaleString()} Hz
                     </span>
                   </div>
-                  <div className="scale-labels">
-                    <span>0.0× (mute)</span>
-                    <span>1.0× (unity)</span>
-                    <span>2.0× (double)</span>
+                </div>
+                
+                <div className="band-status">
+                  <span className={`status-badge ${gainStatus.className}`}>
+                    {gainStatus.label}
+                  </span>
+                  <span className="gain-value" style={{ color: gainColor }}>
+                    {band.scale.toFixed(2)}×
+                  </span>
+                </div>
+                
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteBand(band.id);
+                  }}
+                  disabled={bands.length === 1 || disabled}
+                  className="delete-btn"
+                  aria-label={`Delete band ${index + 1}`}
+                  title="Delete band"
+                >
+                  🗑️
+                </button>
+              </div>
+
+              {/* Visual Frequency Bar */}
+              <div className="freq-visualizer">
+                <div className="freq-bar-bg">
+                  <div 
+                    className="freq-bar-fill"
+                    style={{ 
+                      left: `${freqStart}%`,
+                      width: `${Math.max(freqWidth, 2)}%`,
+                      background: `linear-gradient(90deg, ${gainColor}88, ${gainColor})`
+                    }}
+                  />
+                </div>
+                <div className="freq-scale">
+                  <span>20</span>
+                  <span>100</span>
+                  <span>1k</span>
+                  <span>10k</span>
+                  <span>20k</span>
+                </div>
+              </div>
+
+              {/* Gain Slider */}
+              <div className="gain-control">
+                <div className="gain-header">
+                  <span className="gain-label">Gain</span>
+                  <div className="gain-presets">
+                    <button 
+                      className={`preset-btn ${band.scale === 0 ? 'active' : ''}`}
+                      onClick={() => updateBand(band.id, 'scale', 0)}
+                      disabled={disabled}
+                    >
+                      Mute
+                    </button>
+                    <button 
+                      className={`preset-btn ${band.scale === 0.5 ? 'active' : ''}`}
+                      onClick={() => updateBand(band.id, 'scale', 0.5)}
+                      disabled={disabled}
+                    >
+                      -6dB
+                    </button>
+                    <button 
+                      className={`preset-btn ${band.scale === 1 ? 'active' : ''}`}
+                      onClick={() => updateBand(band.id, 'scale', 1)}
+                      disabled={disabled}
+                    >
+                      Unity
+                    </button>
+                    <button 
+                      className={`preset-btn ${band.scale === 1.5 ? 'active' : ''}`}
+                      onClick={() => updateBand(band.id, 'scale', 1.5)}
+                      disabled={disabled}
+                    >
+                      +3dB
+                    </button>
+                    <button 
+                      className={`preset-btn ${band.scale === 2 ? 'active' : ''}`}
+                      onClick={() => updateBand(band.id, 'scale', 2)}
+                      disabled={disabled}
+                    >
+                      +6dB
+                    </button>
                   </div>
-                </label>
+                </div>
+                
+                <div className="slider-wrapper">
+                  <input
+                    type="range"
+                    min="0"
+                    max="2"
+                    step="0.01"
+                    value={band.scale}
+                    onChange={(e) => updateBand(band.id, 'scale', parseFloat(e.target.value))}
+                    disabled={disabled}
+                    className="gain-slider"
+                    style={{
+                      background: `linear-gradient(90deg, ${gainColor} ${(band.scale / 2) * 100}%, rgba(255,255,255,0.1) ${(band.scale / 2) * 100}%)`
+                    }}
+                  />
+                  <div className="slider-ticks">
+                    <span className="tick muted">0×</span>
+                    <span className="tick">0.5×</span>
+                    <span className="tick unity">1×</span>
+                    <span className="tick">1.5×</span>
+                    <span className="tick boost">2×</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Expanded Frequency Controls */}
+              {isExpanded && (
+                <div className="freq-controls">
+                  <div className="freq-input-group">
+                    <label>
+                      <span className="input-label">
+                        <span className="input-icon">📉</span>
+                        Start Frequency
+                      </span>
+                      <div className="input-wrapper">
+                        <input
+                          type="number"
+                          min="0"
+                          max={nyquist}
+                          step="1"
+                          value={band.startHz}
+                          onChange={(e) => updateBand(band.id, 'startHz', parseFloat(e.target.value) || 0)}
+                          disabled={disabled}
+                          className="freq-input"
+                        />
+                        <span className="input-unit">Hz</span>
+                      </div>
+                    </label>
+                    
+                    <div className="freq-arrow">→</div>
+                    
+                    <label>
+                      <span className="input-label">
+                        <span className="input-icon">📈</span>
+                        End Frequency
+                      </span>
+                      <div className="input-wrapper">
+                        <input
+                          type="number"
+                          min="0"
+                          max={nyquist}
+                          step="1"
+                          value={band.endHz}
+                          onChange={(e) => updateBand(band.id, 'endHz', parseFloat(e.target.value) || 0)}
+                          disabled={disabled}
+                          className="freq-input"
+                        />
+                        <span className="input-unit">Hz</span>
+                      </div>
+                    </label>
+                  </div>
+                  
+                  <div className="freq-presets">
+                    <span className="presets-label">Quick Ranges:</span>
+                    <button 
+                      className="range-preset"
+                      onClick={() => {
+                        updateBand(band.id, 'startHz', 20);
+                        updateBand(band.id, 'endHz', 200);
+                      }}
+                      disabled={disabled}
+                    >
+                      Sub-Bass
+                    </button>
+                    <button 
+                      className="range-preset"
+                      onClick={() => {
+                        updateBand(band.id, 'startHz', 200);
+                        updateBand(band.id, 'endHz', 800);
+                      }}
+                      disabled={disabled}
+                    >
+                      Bass
+                    </button>
+                    <button 
+                      className="range-preset"
+                      onClick={() => {
+                        updateBand(band.id, 'startHz', 800);
+                        updateBand(band.id, 'endHz', 2500);
+                      }}
+                      disabled={disabled}
+                    >
+                      Mids
+                    </button>
+                    <button 
+                      className="range-preset"
+                      onClick={() => {
+                        updateBand(band.id, 'startHz', 2500);
+                        updateBand(band.id, 'endHz', 8000);
+                      }}
+                      disabled={disabled}
+                    >
+                      Presence
+                    </button>
+                    <button 
+                      className="range-preset"
+                      onClick={() => {
+                        updateBand(band.id, 'startHz', 8000);
+                        updateBand(band.id, 'endHz', 20000);
+                      }}
+                      disabled={disabled}
+                    >
+                      Highs
+                    </button>
+                  </div>
+                </div>
+              )}
+              
+              {/* Expand indicator */}
+              <div className="expand-indicator" onClick={() => setExpandedBand(isExpanded ? null : band.id)}>
+                <span className={`expand-icon ${isExpanded ? 'expanded' : ''}`}>▼</span>
+                <span className="expand-text">{isExpanded ? 'Collapse' : 'Expand frequency controls'}</span>
               </div>
             </div>
-          </fieldset>
-        ))}
+          );
+        })}
+      </div>
+
+      {/* Quick Tips */}
+      <div className="quick-tips">
+        <div className="tip">
+          <span className="tip-icon">🎯</span>
+          <span>Click band header to expand/collapse frequency controls</span>
+        </div>
+        <div className="tip">
+          <span className="tip-icon">⌨️</span>
+          <span>Use presets for common frequency ranges</span>
+        </div>
+        <div className="tip">
+          <span className="tip-icon">💾</span>
+          <span>Export your setup to reuse later</span>
+        </div>
       </div>
     </div>
   );
