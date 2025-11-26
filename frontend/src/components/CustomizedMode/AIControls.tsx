@@ -19,6 +19,7 @@
  */
 
 import type { AIControlsProps } from './types';
+import './CustomizedMode.css';
 
 interface AIControlsExtendedProps extends AIControlsProps {
   /** Whether results already exist (changes button text) */
@@ -44,14 +45,14 @@ export function AIControls({
   
   // Button text based on state
   const getProcessButtonText = () => {
-    if (processing) return 'Processing...';
-    if (hasResults) return 'Re-separate Sources';
-    return 'Separate Sources';
+    if (processing) return '⏳ Processing...';
+    if (hasResults) return '🔄 Re-separate Sources';
+    return '✨ Separate Sources';
   };
   
   const getDemoButtonText = () => {
-    if (processing) return 'Processing...';
-    return `Try ${contentType === 'speech' ? 'Speech' : 'Music'} Demo`;
+    if (processing) return '⏳ Processing...';
+    return `🎯 Try ${contentType === 'speech' ? 'Speech' : 'Music'} Demo`;
   };
   
   // Show cache restoration message
@@ -64,8 +65,8 @@ export function AIControls({
       <div className="ai-info-section">
         <p className="ai-description">
           {contentType === 'speech' 
-            ? 'AI-powered speech separation using MultiDecoderDPRNN. Separates speech from background noise and music. Processing typically takes 30-60 seconds.'
-            : 'AI-powered music separation using Hybrid Demucs. Separates audio into drums, bass, vocals, and other instruments. Processing typically takes 60-90 seconds.'}
+            ? '🎤 AI-powered speech separation using MultiDecoderDPRNN. Separates speech from background noise and music. Processing typically takes 30-60 seconds.'
+            : '🎸 AI-powered music separation using Hybrid Demucs. Separates audio into drums, bass, vocals, and other instruments. Processing typically takes 60-90 seconds.'}
         </p>
       </div>
 
@@ -106,7 +107,7 @@ export function AIControls({
         
         {hasResults && cacheInfo && (
           <p className="cache-timestamp">
-            Last processed: {new Date(cacheInfo.timestamp).toLocaleTimeString()}
+            ✅ Last processed: {new Date(cacheInfo.timestamp).toLocaleTimeString()}
           </p>
         )}
       </div>
