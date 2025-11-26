@@ -1,0 +1,193 @@
+/**
+ * LinkedWaveformViewers Styles - Synchronized Signal Viewers
+ */
+
+.linked-viewers {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+/* Control Panel */
+.viewers-control-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-2) var(--spacing-3);
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 8px;
+  flex-wrap: wrap;
+  gap: var(--spacing-2);
+}
+
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+}
+
+.control-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-gray-400);
+  font-weight: var(--font-weight-medium);
+}
+
+.control-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.control-btn {
+  width: 32px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  color: var(--color-gray-300);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.control-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(0, 245, 255, 0.3);
+  color: white;
+}
+
+.control-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.control-btn.reset-btn {
+  width: auto;
+  padding: 0 10px;
+  background: rgba(0, 245, 255, 0.08);
+  border-color: rgba(0, 245, 255, 0.2);
+}
+
+.control-btn.reset-btn:hover:not(:disabled) {
+  background: rgba(0, 245, 255, 0.15);
+}
+
+.view-info {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+}
+
+.zoom-badge {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-accent);
+  background: rgba(0, 245, 255, 0.1);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+.time-range {
+  font-size: var(--font-size-xs);
+  color: var(--color-gray-500);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Viewers Stack */
+.viewers-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.viewer-row {
+  display: flex;
+  align-items: stretch;
+  gap: var(--spacing-2);
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.viewer-label {
+  width: 70px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-2);
+  background: rgba(0, 0, 0, 0.3);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-gray-300);
+}
+
+.label-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.label-dot.input {
+  background: rgba(0, 245, 255, 1);
+  box-shadow: 0 0 6px rgba(0, 245, 255, 0.6);
+}
+
+.label-dot.output {
+  background: rgba(168, 85, 247, 1);
+  box-shadow: 0 0 6px rgba(168, 85, 247, 0.6);
+}
+
+.viewer-canvas {
+  flex: 1;
+  min-width: 0;
+}
+
+.viewer-canvas .waveform-viewer {
+  height: 100%;
+}
+
+.viewer-canvas .waveform-viewer h3 {
+  display: none;
+}
+
+.viewer-canvas canvas {
+  width: 100% !important;
+  height: 80px !important;
+  border: none !important;
+  border-radius: 0;
+}
+
+/* Sync Indicator */
+.sync-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-1);
+  font-size: var(--font-size-xs);
+  color: var(--color-gray-500);
+}
+
+.sync-icon {
+  font-size: 10px;
+}
+
+.sync-text {
+  opacity: 0.7;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .viewers-control-panel {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .viewer-label {
+    width: 60px;
+    font-size: 10px;
+  }
+}

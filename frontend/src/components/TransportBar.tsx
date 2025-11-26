@@ -1,6 +1,6 @@
 /**
- * Modern Transport Bar - Phase 7 Implementation
- * Professional playback controls with visual enhancements
+ * Modern Transport Bar - Compact Inline Design
+ * Professional playback controls that take minimal vertical space
  */
 
 import { PlaybackState } from '../model/types';
@@ -16,6 +16,8 @@ interface TransportBarProps {
   onExport?: () => void;
   fileName?: string;
   isProcessing?: boolean;
+  /** Compact mode for inline display */
+  compact?: boolean;
 }
 
 export default function TransportBar({
@@ -28,6 +30,7 @@ export default function TransportBar({
   onExport,
   fileName,
   isProcessing = false,
+  compact = false,
 }: TransportBarProps) {
   
   const handleSeek = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -54,9 +57,16 @@ export default function TransportBar({
     : 0;
 
   return (
-    <div className="transport-bar glass-panel">
-      {/* Main transport controls */}
+    <div className={`transport-bar glass-panel ${compact ? 'transport-bar--compact' : ''}`}>
+      {/* Single-line transport controls */}
       <div className="transport-controls">
+        {/* File badge (compact only shows at start) */}
+        {fileName && compact && (
+          <span className="file-badge-inline">
+            🎵 {fileName}
+          </span>
+        )}
+        
         <div className="primary-controls">
           <button 
             className="btn btn-icon btn-ghost transport-btn" 
@@ -70,7 +80,7 @@ export default function TransportBar({
           
           {!playbackState.isPlaying ? (
             <button 
-              className="btn btn-accent play-button" 
+              className={`btn btn-accent play-button ${compact ? 'play-button--compact' : ''}`}
               onClick={onPlay}
               aria-label="Play"
               title="Play"
@@ -80,7 +90,7 @@ export default function TransportBar({
             </button>
           ) : (
             <button 
-              className="btn btn-primary play-button" 
+              className={`btn btn-primary play-button ${compact ? 'play-button--compact' : ''}`}
               onClick={onPause}
               aria-label="Pause"
               title="Pause"
@@ -90,14 +100,15 @@ export default function TransportBar({
           )}
         </div>
 
-        {/* Timeline section */}
+        {/* Time display */}
+        <div className="time-display">
+          <span className="current-time">{formatTime(playbackState.currentTime)}</span>
+          <span className="time-separator">/</span>
+          <span className="total-time">{formatTime(playbackState.duration)}</span>
+        </div>
+
+        {/* Timeline slider - inline */}
         <div className="timeline-section">
-          <div className="time-display">
-            <span className="current-time">{formatTime(playbackState.currentTime)}</span>
-            <span className="time-separator">/</span>
-            <span className="total-time">{formatTime(playbackState.duration)}</span>
-          </div>
-          
           <div className="timeline-wrapper">
             <div 
               className="timeline-progress" 
@@ -123,7 +134,7 @@ export default function TransportBar({
           </div>
         </div>
 
-        {/* Secondary controls */}
+        {/* Secondary controls - inline */}
         <div className="secondary-controls">
           {onPlaybackRateChange && (
             <div className="speed-control">
@@ -150,20 +161,26 @@ export default function TransportBar({
 
           {onExport && (
             <button 
-              className="btn btn-primary btn-sm" 
+              className="btn btn-primary btn-sm export-btn" 
               onClick={onExport}
               disabled={isProcessing || !playbackState.duration}
               aria-label="Export audio"
               title="Export processed audio"
             >
-              💾 Export
+              💾
             </button>
+          )}
+          
+          {isProcessing && (
+            <span className="processing-indicator">
+              <span className="status-spinner"></span>
+            </span>
           )}
         </div>
       </div>
 
-      {/* File info */}
-      {fileName && (
+      {/* File info - only in non-compact mode */}
+      {fileName && !compact && (
         <div className="transport-info">
           <span className="file-badge badge badge-primary">
             🎵 {fileName}

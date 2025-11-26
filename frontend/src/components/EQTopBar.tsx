@@ -1,5 +1,5 @@
 
-type AppMode = 'preset' | 'generic' | 'custom';
+type AppMode = 'generic' | 'custom';
 
 interface EQTopBarProps {
   mode: AppMode;
@@ -7,10 +7,9 @@ interface EQTopBarProps {
   isProcessing: boolean;
 }
 
-const MODE_TABS: { id: AppMode; label: string; description: string }[] = [
-  { id: 'preset', label: 'Basic', description: 'Studio presets' },
-  { id: 'generic', label: 'Advanced', description: 'Custom bands' },
-  { id: 'custom', label: 'Expert', description: 'DSP & AI' },
+const MODE_TABS: { id: AppMode; label: string; icon: string; description: string }[] = [
+  { id: 'generic', label: 'Advanced', icon: '🎛️', description: 'Custom EQ Bands' },
+  { id: 'custom', label: 'Expert', icon: '🧠', description: 'DSP & AI Separation' },
 ];
 
 export function EQTopBar({ mode, onModeChange, isProcessing }: EQTopBarProps) {
@@ -32,6 +31,7 @@ export function EQTopBar({ mode, onModeChange, isProcessing }: EQTopBarProps) {
             className={`eq-topbar__tab ${mode === tab.id ? 'active' : ''}`}
             onClick={() => onModeChange(tab.id)}
           >
+            <span className="eq-topbar__tab-icon">{tab.icon}</span>
             <span className="eq-topbar__tab-label">{tab.label}</span>
             <span className="eq-topbar__tab-caption">{tab.description}</span>
           </button>

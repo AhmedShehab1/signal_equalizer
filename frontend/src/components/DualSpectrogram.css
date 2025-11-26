@@ -1,0 +1,253 @@
+/**
+ * DualSpectrogram Styles - Input/Output Spectrum Visualization
+ */
+
+.dual-spectrogram {
+  background: rgba(12, 15, 24, 0.95);
+  border: 1px solid rgba(0, 245, 255, 0.1);
+  border-radius: 12px;
+  padding: var(--spacing-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.dual-spectrogram-collapsed {
+  background: rgba(12, 15, 24, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: var(--spacing-2) var(--spacing-3);
+}
+
+.toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  background: transparent;
+  border: none;
+  color: var(--color-gray-400);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  padding: var(--spacing-1) var(--spacing-2);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+
+.toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--color-gray-200);
+}
+
+.toggle-icon {
+  font-size: 1.1em;
+}
+
+/* Header */
+.spectrogram-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: var(--spacing-2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+}
+
+.spectrogram-header h4 {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+}
+
+.title-icon {
+  opacity: 0.8;
+}
+
+.computing-badge {
+  font-size: var(--font-size-xs);
+  color: var(--color-warning-400);
+  background: rgba(251, 191, 36, 0.1);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+}
+
+/* View toggle (Overlay/Split) */
+.view-toggle,
+.scale-toggle {
+  display: inline-flex;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: var(--radius-md);
+  padding: 2px;
+  gap: 2px;
+}
+
+.view-btn,
+.scale-btn {
+  padding: 4px 10px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-gray-400);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.view-btn:hover,
+.scale-btn:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.view-btn.active,
+.scale-btn.active {
+  color: white;
+  background: rgba(0, 245, 255, 0.2);
+  box-shadow: 0 0 8px rgba(0, 245, 255, 0.15);
+}
+
+.hide-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  color: var(--color-gray-400);
+  cursor: pointer;
+  font-size: 12px;
+  transition: all var(--transition-fast);
+}
+
+.hide-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: white;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Overlay view */
+.spectrogram-overlay {
+  position: relative;
+  width: 100%;
+}
+
+/* Split view */
+.spectrogram-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-3);
+}
+
+.spectrogram-panel {
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 8px;
+  padding: var(--spacing-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+}
+
+.input-panel {
+  border-left: 2px solid rgba(0, 245, 255, 0.5);
+}
+
+.output-panel {
+  border-left: 2px solid rgba(168, 85, 247, 0.5);
+}
+
+.panel-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-gray-400);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding-left: var(--spacing-1);
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.input-dot {
+  background: rgba(0, 245, 255, 1);
+  box-shadow: 0 0 6px rgba(0, 245, 255, 0.6);
+}
+
+.output-dot {
+  background: rgba(168, 85, 247, 1);
+  box-shadow: 0 0 6px rgba(168, 85, 247, 0.6);
+}
+
+.chart-container {
+  position: relative;
+  width: 100%;
+}
+
+.spectrogram-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 120px;
+  color: var(--color-gray-500);
+  font-size: var(--font-size-sm);
+}
+
+/* Footer */
+.spectrogram-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: var(--spacing-2);
+  border-top: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.info-text {
+  font-size: var(--font-size-xs);
+  color: var(--color-gray-500);
+}
+
+.sample-rate {
+  font-size: var(--font-size-xs);
+  color: var(--color-gray-500);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .spectrogram-split {
+    grid-template-columns: 1fr;
+  }
+  
+  .header-controls {
+    flex-wrap: wrap;
+    gap: var(--spacing-1);
+  }
+}

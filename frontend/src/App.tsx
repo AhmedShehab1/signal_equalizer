@@ -4,24 +4,21 @@
 
 import { useState, useEffect, useRef } from 'react';
 import FileLoader from './components/FileLoader';
-import FrequencyCurveEditor from './components/FrequencyCurveEditor';
 import LinkedWaveformViewers from './components/LinkedWaveformViewers';
 import TransportBar from './components/TransportBar';
+import DualSpectrogram from './components/DualSpectrogram';
 import { EQTopBar } from './components/EQTopBar';
-import { PresetToolbar } from './components/PresetToolbar';
-import { ChannelStripPanel } from './components/ChannelStripPanel';
 import GenericMode, { GenericBand, genericBandsToBandSpecs } from './components/GenericMode';
 import CustomizedModePanel from './components/CustomizedModePanel';
-import SpectrumChart, { ScaleType } from './components/SpectrumChart';
 import { AudioPlayback } from './lib/playback';
 import { stftFrames, istft } from './lib/stft';
 import { Complex } from './lib/fft';
 import { buildGainVector } from './lib/spectrogram';
-import { FrequencyBand, EqualizerMode, PlaybackState, BandSpec, STFTOptions } from './model/types';
+import { PlaybackState, BandSpec, STFTOptions } from './model/types';
 import { SpeechSeparationResult, SeparationResult } from './lib/api';
 import './App.css';
 
-type AppMode = 'preset' | 'generic' | 'custom';
+type AppMode = 'generic' | 'custom';
 type ContentType = 'music' | 'speech';
 type ModelType = 'demucs' | 'dprnn';
 
@@ -44,13 +41,8 @@ function App() {
   const [fileName, setFileName] = useState<string>('');
   const [audioFile, setAudioFile] = useState<File | null>(null); // Track raw file for AI processing
   
-  // Mode switcher
-  const [appMode, setAppMode] = useState<AppMode>('preset');
-  
-  // Preset mode state
-  const [bands, setBands] = useState<FrequencyBand[]>([]);
-  const [modes, setModes] = useState<EqualizerMode[]>([]);
-  const [currentMode, setCurrentMode] = useState<string | null>(null);
+  // Mode switcher (only generic and custom modes now)
+  const [appMode, setAppMode] = useState<AppMode>('generic');
   
   // Generic mode state
   const [genericBands, setGenericBands] = useState<GenericBand[]>([]);
@@ -64,12 +56,8 @@ function App() {
   // Customized mode sub-tab state (dsp or ai)
   const [customModeTab, setCustomModeTab] = useState<'dsp' | 'ai'>('dsp');
   
-  // Spectrum chart data (FFT magnitude/frequency)
-  const [spectrumData, setSpectrumData] = useState<{
-    magnitudes: Float32Array;
-    frequencies: Float32Array;
-  } | null>(null);
-  const [spectrumScaleType, setSpectrumScaleType] = useState<ScaleType>('logarithmic');
+  // Spectrogram visibility toggle
+  const [showSpectrograms, setShowSpectrograms] = useState<boolean>(true);
   
   // Processing state
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
@@ -84,13 +72,6 @@ function App() {
 
   const playbackRef = useRef<AudioPlayback>(new AudioPlayback());
   const recomputeTokenRef = useRef<number>(0);
-
-  // Map UI bands → BandSpec (preset mode: dB → linear)
-  const presetBandsToBandSpecs = (bs: FrequencyBand[]): BandSpec[] =>
-    bs.map(b => ({
-      scale: Math.pow(10, b.gain / 20),
-      windows: [{ f_start_hz: b.range[0], f_end_hz: b.range[1] }],
-    }));
 
   // STFT-domain EQ processing pipeline with race protection
   const recomputeWithSTFTEQ = async (
@@ -188,25 +169,6 @@ function App() {
         return;
       }
 
-      // 7. Extract average spectrum from STFT for spectrum chart visualization
-      // Average the magnitudes across all frames
-      const numBins = Math.floor(stftOptions.fftSize / 2) + 1;
-      const avgMagnitudes = new Float32Array(numBins);
-      const frequencies = new Float32Array(numBins);
-      
-      // Calculate average magnitude in dB for each frequency bin
-      for (let bin = 0; bin < numBins; bin++) {
-        let sumMag = 0;
-        for (const frame of modifiedFrames) {
-          const mag = Math.sqrt(frame[bin].re ** 2 + frame[bin].im ** 2);
-          sumMag += mag;
-        }
-        const avgMag = sumMag / modifiedFrames.length;
-        // Convert to dB with floor at -80 dB
-        avgMagnitudes[bin] = avgMag > 0 ? Math.max(-80, 20 * Math.log10(avgMag)) : -80;
-        frequencies[bin] = (bin * sampleRate) / stftOptions.fftSize;
-      }
-
       // Final check before applying state changes
       if (myToken !== recomputeTokenRef.current) {
         console.log('Spectrum computation cancelled: newer request exists');
@@ -215,7 +177,6 @@ function App() {
 
       // Apply state changes only if this is still the current request
       setProcessedBuffer(processedAudioBuffer);
-      setSpectrumData({ magnitudes: avgMagnitudes, frequencies });
 
     } catch (error) {
       // Only set error if this is still the current request
@@ -239,34 +200,6 @@ function App() {
     }
     await recomputeWithSTFTEQ(originalBuffer, bandSpecs);
   };
-
-  // Load modes from JSON files
-  useEffect(() => {
-    const loadModes = async () => {
-      try {
-        const modeNames = ['musical', 'animals', 'voices'];
-        const loadedModes: EqualizerMode[] = [];
-
-        for (const modeName of modeNames) {
-          try {
-            const response = await fetch(`/modes/${modeName}.json`);
-            if (response.ok) {
-              const mode = await response.json();
-              loadedModes.push(mode);
-            }
-          } catch (error) {
-            console.warn(`Failed to load ${modeName} mode:`, error);
-          }
-        }
-
-        setModes(loadedModes);
-      } catch (error) {
-        console.error('Error loading modes:', error);
-      }
-    };
-
-    loadModes();
-  }, []);
 
   // Initialize playback and subscribe to time updates
   useEffect(() => {
@@ -326,18 +259,6 @@ function App() {
       playbackRate: 1.0,
     });
 
-    // Initialize default bands for preset mode
-    const defaultBands: FrequencyBand[] = [
-      { id: '1', label: 'Sub Bass', frequency: 60, gain: 0, range: [20, 100] },
-      { id: '2', label: 'Bass', frequency: 150, gain: 0, range: [100, 250] },
-      { id: '3', label: 'Low Mid', frequency: 400, gain: 0, range: [250, 500] },
-      { id: '4', label: 'Mid', frequency: 1000, gain: 0, range: [500, 2000] },
-      { id: '5', label: 'High Mid', frequency: 3000, gain: 0, range: [2000, 4000] },
-      { id: '6', label: 'Presence', frequency: 6000, gain: 0, range: [4000, 8000] },
-      { id: '7', label: 'Brilliance', frequency: 12000, gain: 0, range: [8000, 20000] },
-    ];
-    setBands(defaultBands);
-
     // Initialize default generic bands
     const defaultGenericBands: GenericBand[] = [
       { id: '1', startHz: 20, endHz: 200, scale: 1.0 },
@@ -350,40 +271,8 @@ function App() {
     // Reset playback rate to 1.0
     playbackRef.current.setPlaybackRate(1.0);
 
-    // Initial processing based on current mode
-    if (appMode === 'preset') {
-      await runRecompute(presetBandsToBandSpecs(defaultBands));
-    } else {
-      await runRecompute(genericBandsToBandSpecs(defaultGenericBands));
-    }
-  };
-
-  const handleBandChange = async (bandId: string, gain: number) => {
-    const updatedBands = bands.map(band =>
-      band.id === bandId ? { ...band, gain } : band
-    );
-    setBands(updatedBands);
-    await runRecompute(presetBandsToBandSpecs(updatedBands));
-  };
-
-  const handleModeSelect = async (modeName: string) => {
-    const mode = modes.find(m => m.name === modeName);
-    if (!mode) return;
-
-    setCurrentMode(modeName);
-    setBands(mode.bands);
-    await runRecompute(presetBandsToBandSpecs(mode.bands));
-  };
-
-  const handlePresetReset = async () => {
-    if (!originalBuffer || bands.length === 0) {
-      return;
-    }
-
-    const resetBands = bands.map(band => ({ ...band, gain: 0 }));
-    setBands(resetBands);
-    setCurrentMode(null);
-    await runRecompute(presetBandsToBandSpecs(resetBands));
+    // Initial processing with default bands
+    await runRecompute(genericBandsToBandSpecs(defaultGenericBands));
   };
 
   const handleGenericBandsChange = async (newBands: GenericBand[]) => {
@@ -449,16 +338,14 @@ function App() {
     if (!originalBuffer) return;
     
     // Reprocess with the appropriate mode
-    if (mode === 'preset') {
-      await runRecompute(presetBandsToBandSpecs(bands));
-    } else if (mode === 'generic') {
+    if (mode === 'generic') {
       await runRecompute(genericBandsToBandSpecs(genericBands));
     } else if (mode === 'custom') {
       // Custom mode: don't recompute automatically
       // Let the user control DSP/AI processing
-    } else if (customModeBandSpecs.length > 0) {
-      // Only recompute if custom mode has loaded specs
-      await runRecompute(customModeBandSpecs);
+      if (customModeBandSpecs.length > 0) {
+        await runRecompute(customModeBandSpecs);
+      }
     }
   };
 
@@ -493,31 +380,21 @@ function App() {
 
   const hasLoadedFile = Boolean(originalBuffer);
 
-  const fileLoaderSlot = (
-    <div className="file-loader-slot">
-      <FileLoader onFileLoad={handleFileLoad} />
-      {fileName && <span className="file-loader-slot__badge">{fileName}</span>}
-    </div>
-  );
-
   return (
     <div className="eq-app">
       <div className="eq-card">
-        <EQTopBar
-          mode={appMode}
-          onModeChange={handleModeSwitch}
-          isProcessing={isProcessing}
-        />
-
-        <PresetToolbar
-          modes={modes}
-          currentMode={currentMode}
-          onModeSelect={handleModeSelect}
-          mode={appMode}
-          fileLoaderSlot={fileLoaderSlot}
-          disabled={!hasLoadedFile || isProcessing}
-          onReset={hasLoadedFile && appMode === 'preset' ? handlePresetReset : undefined}
-        />
+        {/* Top Bar with Mode Tabs and File Loader */}
+        <div className="eq-header">
+          <EQTopBar
+            mode={appMode}
+            onModeChange={handleModeSwitch}
+            isProcessing={isProcessing}
+          />
+          <div className="eq-header__file">
+            <FileLoader onFileLoad={handleFileLoad} />
+            {fileName && <span className="eq-file-badge">{fileName}</span>}
+          </div>
+        </div>
 
         {processingError && (
           <div className="eq-alert eq-alert--error">
@@ -525,102 +402,88 @@ function App() {
           </div>
         )}
 
-        <div className={`eq-main ${!hasLoadedFile ? 'eq-main--empty' : ''}`}>
-          <section className="eq-surface glass-panel">
-            {!hasLoadedFile && (
-              <div className="eq-empty-state">
-                <p>Load an audio file to begin shaping your mix.</p>
-                <p className="eq-empty-state__hint">Supported formats: WAV, MP3, FLAC</p>
-              </div>
-            )}
+        {/* Main Content Area - Spectrum Prominent at Top */}
+        <div className={`eq-content ${!hasLoadedFile ? 'eq-content--empty' : ''}`}>
+          {!hasLoadedFile && (
+            <div className="eq-empty-state">
+              <div className="eq-empty-icon">🎧</div>
+              <h3>Welcome to Signal Equalizer</h3>
+              <p>Load an audio file to begin shaping your mix.</p>
+              <p className="eq-empty-state__hint">Supported formats: WAV, MP3, FLAC</p>
+            </div>
+          )}
 
-            {hasLoadedFile && appMode === 'preset' && (
-              <>
-                <FrequencyCurveEditor
-                  sampleRate={originalBuffer!.sampleRate}
-                  disabled={isProcessing}
+          {hasLoadedFile && (
+            <>
+              {/* TRANSPORT BAR - Compact inline at top */}
+              <section className="eq-transport-section">
+                <TransportBar
+                  playbackState={playbackState}
+                  onPlay={handlePlay}
+                  onPause={handlePause}
+                  onStop={handleStop}
+                  onSeek={handleSeek}
+                  onPlaybackRateChange={handlePlaybackRateChange}
+                  fileName={fileName}
+                  isProcessing={isProcessing}
+                  compact={true}
                 />
+              </section>
+
+              {/* DUAL SPECTROGRAM - Input & Output with Toggle */}
+              <section className="eq-spectrum-section">
+                <DualSpectrogram
+                  inputBuffer={originalBuffer}
+                  outputBuffer={processedBuffer}
+                  visible={showSpectrograms}
+                  onVisibilityChange={setShowSpectrograms}
+                  height={180}
+                />
+              </section>
+
+              {/* Waveform Section - Linked Cine Viewers */}
+              <section className="eq-waveform-section glass-panel">
+                <LinkedWaveformViewers
+                  inputBuffer={originalBuffer}
+                  outputBuffer={processedBuffer}
+                  currentTime={playbackState.currentTime}
+                />
+              </section>
+
+              {/* Mode Controls - Compact Horizontal Layout */}
+              <section className="eq-controls-section glass-panel">
+                {appMode === 'generic' && (
+                  <GenericMode
+                    onBandsChange={handleGenericBandsChange}
+                    sampleRate={originalBuffer!.sampleRate}
+                    disabled={isProcessing}
+                  />
+                )}
+
+                {appMode === 'custom' && (
+                  <CustomizedModePanel
+                    onBandSpecsChange={handleCustomModeBandSpecsChange}
+                    disabled={isProcessing}
+                    audioFile={audioFile}
+                    onAudioMixed={handleAIMixedAudio}
+                    aiCache={aiSeparationCache}
+                    onAICacheUpdate={handleAICacheUpdate}
+                    activeTab={customModeTab}
+                    onTabChange={handleCustomModeTabChange}
+                  />
+                )}
+
                 {isProcessing && (
-                  <div className="eq-processing-pill" role="status">
-                    Processing audio…
+                  <div className="eq-processing-overlay">
+                    <div className="eq-processing-spinner" />
+                    <span>Processing audio…</span>
                   </div>
                 )}
-              </>
-            )}
-
-            {hasLoadedFile && appMode === 'generic' && (
-              <GenericMode
-                onBandsChange={handleGenericBandsChange}
-                sampleRate={originalBuffer!.sampleRate}
-                disabled={isProcessing}
-              />
-            )}
-
-            {hasLoadedFile && appMode === 'custom' && (
-              <CustomizedModePanel
-                onBandSpecsChange={handleCustomModeBandSpecsChange}
-                disabled={isProcessing}
-                audioFile={audioFile}
-                onAudioMixed={handleAIMixedAudio}
-                aiCache={aiSeparationCache}
-                onAICacheUpdate={handleAICacheUpdate}
-                activeTab={customModeTab}
-                onTabChange={handleCustomModeTabChange}
-              />
-            )}
-          </section>
-
-          {hasLoadedFile && appMode === 'preset' && (
-            <ChannelStripPanel
-              bands={bands}
-              onBandChange={handleBandChange}
-              disabled={isProcessing}
-            />
+              </section>
+            </>
           )}
         </div>
-
-        {hasLoadedFile && (
-          <div className="eq-lower-panels">
-            <div className="eq-panel glass-panel">
-              <div className="eq-panel__header">
-                <h4>Waveforms</h4>
-                <span className="eq-panel__subtext">Original vs processed</span>
-              </div>
-              <LinkedWaveformViewers
-                inputBuffer={originalBuffer}
-                outputBuffer={processedBuffer}
-                currentTime={playbackState.currentTime}
-              />
-            </div>
-
-            {spectrumData && (
-              <SpectrumChart
-                magnitudes={spectrumData.magnitudes}
-                frequencies={spectrumData.frequencies}
-                sampleRate={originalBuffer!.sampleRate}
-                title="Frequency Spectrum"
-                scaleType={spectrumScaleType}
-                onScaleChange={setSpectrumScaleType}
-                height={280}
-                colorTheme="cyan"
-              />
-            )}
-          </div>
-        )}
       </div>
-
-      {hasLoadedFile && (
-        <TransportBar
-          playbackState={playbackState}
-          onPlay={handlePlay}
-          onPause={handlePause}
-          onStop={handleStop}
-          onSeek={handleSeek}
-          onPlaybackRateChange={handlePlaybackRateChange}
-          fileName={fileName}
-          isProcessing={isProcessing}
-        />
-      )}
     </div>
   );
 }
