@@ -30,7 +30,7 @@ interface CustomizedModePanelProps {
   onBandSpecsChange: (bandSpecs: BandSpec[]) => void;
   disabled?: boolean;
   audioFile?: File | null;
-  onAudioMixed?: (mixedBuffer: AudioBuffer) => void;
+  onAudioMixed?: (mixedBuffer: AudioBuffer) => void | Promise<void>;
   aiCache?: AISeparationCache | null;
   onAICacheUpdate?: (
     result: SpeechSeparationResult | SeparationResult | null,

@@ -12,8 +12,11 @@ interface BandsListProps {
 
 export default function BandsList({ bands, onBandChange, disabled = false }: BandsListProps) {
   return (
-    <div className="bands-list">
-      <h2>Equalizer Bands</h2>
+    <div className="bands-list glass-panel">
+      <div className="glass-panel-header">
+        <h2>Equalizer Bands</h2>
+        <span className="badge badge-primary">{bands.length} Bands</span>
+      </div>
       <fieldset disabled={disabled} style={{ border: 'none', padding: 0, margin: 0 }}>
         {bands.map(band => (
           <div key={band.id} className="band">

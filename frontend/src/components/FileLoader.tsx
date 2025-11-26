@@ -5,7 +5,7 @@
 import { useRef } from 'react';
 
 interface FileLoaderProps {
-  onFileLoad: (buffer: AudioBuffer, fileName: string, file: File) => void;
+  onFileLoad: (buffer: AudioBuffer, fileName: string, file: File) => void | Promise<void>;
 }
 
 export default function FileLoader({ onFileLoad }: FileLoaderProps) {
@@ -20,7 +20,7 @@ export default function FileLoader({ onFileLoad }: FileLoaderProps) {
       const audioContext = new AudioContext();
       const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
       
-      onFileLoad(audioBuffer, file.name, file);
+      await onFileLoad(audioBuffer, file.name, file);
     } catch (error) {
       console.error('Error loading audio file:', error);
       alert('Failed to load audio file. Please try a different file.');
@@ -36,8 +36,8 @@ export default function FileLoader({ onFileLoad }: FileLoaderProps) {
         onChange={handleFileChange}
         style={{ display: 'none' }}
       />
-      <button onClick={() => fileInputRef.current?.click()}>
-        Load Audio File
+      <button className="btn btn-accent" onClick={() => fileInputRef.current?.click()}>
+        🎵 Load Audio File
       </button>
     </div>
   );

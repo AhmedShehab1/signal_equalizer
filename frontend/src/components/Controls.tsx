@@ -40,20 +40,21 @@ export default function Controls({
   };
 
   return (
-    <div className="controls">
+    <div className="controls glass-panel">
       <div className="playback-buttons">
         {!playbackState.isPlaying ? (
-          <button onClick={onPlay}>Play</button>
+          <button className="btn btn-accent" onClick={onPlay}>▶ Play</button>
         ) : (
-          <button onClick={onPause}>Pause</button>
+          <button className="btn btn-primary" onClick={onPause}>⏸ Pause</button>
         )}
-        <button onClick={onStop}>Stop</button>
+        <button className="btn btn-ghost" onClick={onStop}>⏹ Stop</button>
         
         {onPlaybackRateChange && (
           <div className="playback-rate-control">
-            <label htmlFor="playback-rate">Speed:</label>
+            <label htmlFor="playback-rate">⚡ Speed:</label>
             <select 
               id="playback-rate"
+              className="custom-select"
               value={playbackState.playbackRate.toString()}
               onChange={handlePlaybackRateChange}
               aria-label="Playback speed"
