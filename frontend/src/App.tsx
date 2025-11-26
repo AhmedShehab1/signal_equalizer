@@ -4,18 +4,20 @@
 
 import { useState, useEffect, useRef } from 'react';
 import FileLoader from './components/FileLoader';
-import BandsList from './components/BandsList';
+import FrequencyCurveEditor from './components/FrequencyCurveEditor';
 import LinkedWaveformViewers from './components/LinkedWaveformViewers';
-import SpectrogramPanel from './components/SpectrogramPanel';
-import Controls from './components/Controls';
-import ModeSelector from './components/ModeSelector';
+import TransportBar from './components/TransportBar';
+import { EQTopBar } from './components/EQTopBar';
+import { PresetToolbar } from './components/PresetToolbar';
+import { ChannelStripPanel } from './components/ChannelStripPanel';
 import GenericMode, { GenericBand, genericBandsToBandSpecs } from './components/GenericMode';
 import CustomizedModePanel from './components/CustomizedModePanel';
+import SpectrumChart, { ScaleType } from './components/SpectrumChart';
 import { AudioPlayback } from './lib/playback';
 import { stftFrames, istft } from './lib/stft';
 import { Complex } from './lib/fft';
-import { generateSpectrogram, buildGainVector } from './lib/spectrogram';
-import { FrequencyBand, EqualizerMode, PlaybackState, SpectrogramData, BandSpec, STFTOptions } from './model/types';
+import { buildGainVector } from './lib/spectrogram';
+import { FrequencyBand, EqualizerMode, PlaybackState, BandSpec, STFTOptions } from './model/types';
 import { SpeechSeparationResult, SeparationResult } from './lib/api';
 import './App.css';
 
@@ -62,9 +64,12 @@ function App() {
   // Customized mode sub-tab state (dsp or ai)
   const [customModeTab, setCustomModeTab] = useState<'dsp' | 'ai'>('dsp');
   
-  // Dual spectrograms: input and output
-  const [inputSpectrogramData, setInputSpectrogramData] = useState<SpectrogramData | null>(null);
-  const [outputSpectrogramData, setOutputSpectrogramData] = useState<SpectrogramData | null>(null);
+  // Spectrum chart data (FFT magnitude/frequency)
+  const [spectrumData, setSpectrumData] = useState<{
+    magnitudes: Float32Array;
+    frequencies: Float32Array;
+  } | null>(null);
+  const [spectrumScaleType, setSpectrumScaleType] = useState<ScaleType>('logarithmic');
   
   // Processing state
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
@@ -109,7 +114,7 @@ function App() {
       };
 
       // 1. Compute STFT of original signal
-      const originalStftFrames = stftFrames(signal, stftOptions);
+      const originalStftFrames = await stftFrames(signal, stftOptions, sampleRate);
 
       // Check if still current after async operation
       if (myToken !== recomputeTokenRef.current) {
@@ -153,7 +158,7 @@ function App() {
       }
 
       // 4. Inverse STFT
-      const outputSamples = istft(modifiedFrames, stftOptions);
+      const outputSamples = await istft(modifiedFrames, stftOptions);
 
       // Check if still current after heavy ISTFT operation
       if (myToken !== recomputeTokenRef.current) {
@@ -183,21 +188,34 @@ function App() {
         return;
       }
 
-      // 7. Generate output spectrogram
-      const outputSpectrogram = generateSpectrogram(
-        Array.from(outputSamples),
-        sampleRate
-      );
+      // 7. Extract average spectrum from STFT for spectrum chart visualization
+      // Average the magnitudes across all frames
+      const numBins = Math.floor(stftOptions.fftSize / 2) + 1;
+      const avgMagnitudes = new Float32Array(numBins);
+      const frequencies = new Float32Array(numBins);
+      
+      // Calculate average magnitude in dB for each frequency bin
+      for (let bin = 0; bin < numBins; bin++) {
+        let sumMag = 0;
+        for (const frame of modifiedFrames) {
+          const mag = Math.sqrt(frame[bin].re ** 2 + frame[bin].im ** 2);
+          sumMag += mag;
+        }
+        const avgMag = sumMag / modifiedFrames.length;
+        // Convert to dB with floor at -80 dB
+        avgMagnitudes[bin] = avgMag > 0 ? Math.max(-80, 20 * Math.log10(avgMag)) : -80;
+        frequencies[bin] = (bin * sampleRate) / stftOptions.fftSize;
+      }
 
       // Final check before applying state changes
       if (myToken !== recomputeTokenRef.current) {
-        console.log('Spectrogram generation cancelled: newer request exists');
+        console.log('Spectrum computation cancelled: newer request exists');
         return;
       }
 
       // Apply state changes only if this is still the current request
       setProcessedBuffer(processedAudioBuffer);
-      setOutputSpectrogramData(outputSpectrogram);
+      setSpectrumData({ magnitudes: avgMagnitudes, frequencies });
 
     } catch (error) {
       // Only set error if this is still the current request
@@ -332,15 +350,6 @@ function App() {
     // Reset playback rate to 1.0
     playbackRef.current.setPlaybackRate(1.0);
 
-    // Generate input spectrogram
-    const signal = buffer.getChannelData(0);
-    const inputSpectrogram = generateSpectrogram(
-      Array.from(signal),
-      buffer.sampleRate
-    );
-    setInputSpectrogramData(inputSpectrogram);
-    setOutputSpectrogramData(null);
-
     // Initial processing based on current mode
     if (appMode === 'preset') {
       await runRecompute(presetBandsToBandSpecs(defaultBands));
@@ -366,6 +375,17 @@ function App() {
     await runRecompute(presetBandsToBandSpecs(mode.bands));
   };
 
+  const handlePresetReset = async () => {
+    if (!originalBuffer || bands.length === 0) {
+      return;
+    }
+
+    const resetBands = bands.map(band => ({ ...band, gain: 0 }));
+    setBands(resetBands);
+    setCurrentMode(null);
+    await runRecompute(presetBandsToBandSpecs(resetBands));
+  };
+
   const handleGenericBandsChange = async (newBands: GenericBand[]) => {
     setGenericBands(newBands);
     await runRecompute(genericBandsToBandSpecs(newBands));
@@ -379,18 +399,18 @@ function App() {
     }
   };
 
-  const handleAIMixedAudio = (mixedBuffer: AudioBuffer) => {
-    // Set the mixed audio as the processed buffer for playback
-    setProcessedBuffer(mixedBuffer);
-    
-    // Update playback to use the new buffer
-    playbackRef.current.setBuffer(mixedBuffer);
-    
-    // Generate spectrogram for the mixed output
-    const channelData = mixedBuffer.getChannelData(0);
-    const samples = Array.from(channelData);
-    const spectrogramData = generateSpectrogram(samples, mixedBuffer.sampleRate, 2048, 512);
-    setOutputSpectrogramData(spectrogramData);
+  const handleAIMixedAudio = async (mixedBuffer: AudioBuffer) => {
+    try {
+      // Set the mixed audio as the processed buffer for playback
+      setProcessedBuffer(mixedBuffer);
+
+      // Update playback to use the new buffer
+      playbackRef.current.setBuffer(mixedBuffer);
+
+      // Note: Spectrum chart will update when user triggers DSP recompute
+    } catch (error) {
+      console.error('Failed to update AI mixed audio', error);
+    }
   };
 
   // Save AI separation results to cache
@@ -471,118 +491,135 @@ function App() {
     setPlaybackState(prev => ({ ...prev, playbackRate: rate }));
   };
 
-  return (
-    <div className="app">
-      <h1>Signal Equalizer</h1>
-      
+  const hasLoadedFile = Boolean(originalBuffer);
+
+  const fileLoaderSlot = (
+    <div className="file-loader-slot">
       <FileLoader onFileLoad={handleFileLoad} />
-      
-      {fileName && <p>Loaded: {fileName}</p>}
+      {fileName && <span className="file-loader-slot__badge">{fileName}</span>}
+    </div>
+  );
 
-      {/* Mode switcher */}
-      {originalBuffer && (
-        <div className="mode-switcher">
-          <button
-            className={appMode === 'preset' ? 'active' : ''}
-            onClick={() => handleModeSwitch('preset')}
-            disabled={isProcessing}
-          >
-            Preset Modes
-          </button>
-          <button
-            className={appMode === 'generic' ? 'active' : ''}
-            onClick={() => handleModeSwitch('generic')}
-            disabled={isProcessing}
-          >
-            Generic Mode
-          </button>
-          <button
-            className={appMode === 'custom' ? 'active' : ''}
-            onClick={() => handleModeSwitch('custom')}
-            disabled={isProcessing}
-          >
-            Customized Modes
-          </button>
-        </div>
-      )}
+  return (
+    <div className="eq-app">
+      <div className="eq-card">
+        <EQTopBar
+          mode={appMode}
+          onModeChange={handleModeSwitch}
+          isProcessing={isProcessing}
+        />
 
-      {isProcessing && (
-        <div className="processing-indicator">
-          <div className="spinner"></div>
-          <p>Processing audio...</p>
-        </div>
-      )}
+        <PresetToolbar
+          modes={modes}
+          currentMode={currentMode}
+          onModeSelect={handleModeSelect}
+          mode={appMode}
+          fileLoaderSlot={fileLoaderSlot}
+          disabled={!hasLoadedFile || isProcessing}
+          onReset={hasLoadedFile && appMode === 'preset' ? handlePresetReset : undefined}
+        />
 
-      {processingError && (
-        <div className="error-message">
-          <p>Error: {processingError}</p>
-        </div>
-      )}
+        {processingError && (
+          <div className="eq-alert eq-alert--error">
+            <p>❌ Error: {processingError}</p>
+          </div>
+        )}
 
-      {originalBuffer && (
-        <>
-          <Controls
-            playbackState={playbackState}
-            onPlay={handlePlay}
-            onPause={handlePause}
-            onStop={handleStop}
-            onSeek={handleSeek}
-            onPlaybackRateChange={handlePlaybackRateChange}
-          />
+        <div className={`eq-main ${!hasLoadedFile ? 'eq-main--empty' : ''}`}>
+          <section className="eq-surface glass-panel">
+            {!hasLoadedFile && (
+              <div className="eq-empty-state">
+                <p>Load an audio file to begin shaping your mix.</p>
+                <p className="eq-empty-state__hint">Supported formats: WAV, MP3, FLAC</p>
+              </div>
+            )}
 
-          {appMode === 'preset' ? (
-            <>
-              {modes.length > 0 && (
-                <ModeSelector
-                  modes={modes}
-                  currentMode={currentMode}
-                  onModeSelect={handleModeSelect}
+            {hasLoadedFile && appMode === 'preset' && (
+              <>
+                <FrequencyCurveEditor
+                  sampleRate={originalBuffer!.sampleRate}
+                  disabled={isProcessing}
                 />
-              )}
+                {isProcessing && (
+                  <div className="eq-processing-pill" role="status">
+                    Processing audio…
+                  </div>
+                )}
+              </>
+            )}
 
-              <BandsList 
-                bands={bands} 
-                onBandChange={handleBandChange}
+            {hasLoadedFile && appMode === 'generic' && (
+              <GenericMode
+                onBandsChange={handleGenericBandsChange}
+                sampleRate={originalBuffer!.sampleRate}
                 disabled={isProcessing}
               />
-            </>
-          ) : appMode === 'generic' ? (
-            <GenericMode
-              onBandsChange={handleGenericBandsChange}
-              sampleRate={originalBuffer.sampleRate}
+            )}
+
+            {hasLoadedFile && appMode === 'custom' && (
+              <CustomizedModePanel
+                onBandSpecsChange={handleCustomModeBandSpecsChange}
+                disabled={isProcessing}
+                audioFile={audioFile}
+                onAudioMixed={handleAIMixedAudio}
+                aiCache={aiSeparationCache}
+                onAICacheUpdate={handleAICacheUpdate}
+                activeTab={customModeTab}
+                onTabChange={handleCustomModeTabChange}
+              />
+            )}
+          </section>
+
+          {hasLoadedFile && appMode === 'preset' && (
+            <ChannelStripPanel
+              bands={bands}
+              onBandChange={handleBandChange}
               disabled={isProcessing}
             />
-          ) : appMode === 'custom' ? (
-            <CustomizedModePanel
-              onBandSpecsChange={handleCustomModeBandSpecsChange}
-              disabled={isProcessing}
-              audioFile={audioFile}
-              onAudioMixed={handleAIMixedAudio}
-              aiCache={aiSeparationCache}
-              onAICacheUpdate={handleAICacheUpdate}
-              activeTab={customModeTab}
-              onTabChange={handleCustomModeTabChange}
-            />
-          ) : null}
+          )}
+        </div>
 
-          <LinkedWaveformViewers
-            inputBuffer={originalBuffer}
-            outputBuffer={processedBuffer}
-            currentTime={playbackState.currentTime}
-          />
-
-          <div className="spectrograms-container">
-            <div className="spectrogram-section">
-              <h2>Input Spectrogram</h2>
-              <SpectrogramPanel spectrogramData={inputSpectrogramData} />
+        {hasLoadedFile && (
+          <div className="eq-lower-panels">
+            <div className="eq-panel glass-panel">
+              <div className="eq-panel__header">
+                <h4>Waveforms</h4>
+                <span className="eq-panel__subtext">Original vs processed</span>
+              </div>
+              <LinkedWaveformViewers
+                inputBuffer={originalBuffer}
+                outputBuffer={processedBuffer}
+                currentTime={playbackState.currentTime}
+              />
             </div>
 
-            <div className="spectrogram-section">
-              <h2>Output Spectrogram (EQ Applied)</h2>
-              <SpectrogramPanel spectrogramData={outputSpectrogramData} />
-            </div>
+            {spectrumData && (
+              <SpectrumChart
+                magnitudes={spectrumData.magnitudes}
+                frequencies={spectrumData.frequencies}
+                sampleRate={originalBuffer!.sampleRate}
+                title="Frequency Spectrum"
+                scaleType={spectrumScaleType}
+                onScaleChange={setSpectrumScaleType}
+                height={280}
+                colorTheme="cyan"
+              />
+            )}
           </div>
-        </>
+        )}
+      </div>
+
+      {hasLoadedFile && (
+        <TransportBar
+          playbackState={playbackState}
+          onPlay={handlePlay}
+          onPause={handlePause}
+          onStop={handleStop}
+          onSeek={handleSeek}
+          onPlaybackRateChange={handlePlaybackRateChange}
+          fileName={fileName}
+          isProcessing={isProcessing}
+        />
       )}
     </div>
   );
