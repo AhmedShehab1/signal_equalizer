@@ -8,7 +8,7 @@ interface EQTopBarProps {
 }
 
 const MODE_TABS: { id: AppMode; label: string; icon: string; description: string }[] = [
-  { id: 'generic', label: 'Advanced', icon: '🎛️', description: 'Custom EQ Bands' },
+  { id: 'generic', label: 'Advanced', icon: '🎛️', description: 'Generic EQ Bands' },
   { id: 'custom', label: 'Expert', icon: '🧠', description: 'DSP & AI Separation' },
 ];
 
