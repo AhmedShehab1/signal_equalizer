@@ -130,6 +130,7 @@ export default function CustomizedModePanel({
 
   // ===== Mode Switching =====
   
+  // TICKET 1: Mode switch should NOT trigger processing or wipe state
   const handleModeSwitch = (newMode: ProcessingMode) => {
     if (newMode === processingMode) return;
     
@@ -137,19 +138,14 @@ export default function CustomizedModePanel({
     setError(null);
     setShowTools(true);
     
+    // Notify parent of tab change - parent handles state preservation
     if (onTabChange) {
       onTabChange(newMode);
     }
     
-    if (newMode === 'dsp') {
-      setSpeechResult(null);
-      setMusicResult(null);
-      setSourceGains({});
-      setSourceBuffers({});
-      setAiProcessing(false);
-    } else {
-      onBandSpecsChange([]);
-    }
+    // DON'T clear AI state when switching to DSP - let parent handle restoration
+    // DON'T call onBandSpecsChange([]) - this triggers unwanted processing
+    // Each mode maintains its own state independently
   };
 
   const handleContentTypeChange = (newType: ContentType) => {
