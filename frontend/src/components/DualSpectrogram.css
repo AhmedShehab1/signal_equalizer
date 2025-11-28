@@ -1,5 +1,6 @@
 /**
  * DualSpectrogram Styles - Input/Output Spectrum Visualization
+ * TICKET 2: Added proper spacing and z-index to prevent overlap
  */
 
 .dual-spectrogram {
@@ -7,6 +8,7 @@
   border: 1px solid rgba(0, 245, 255, 0.1);
   border-radius: 12px;
   padding: var(--spacing-3);
+  padding-bottom: var(--spacing-4); /* Extra padding at bottom for x-axis labels */
   display: flex;
   flex-direction: column;
   gap: var(--spacing-2);
@@ -127,7 +129,8 @@
 
 /* View toggle (Overlay/Split) */
 .view-toggle,
-.scale-toggle {
+.scale-toggle,
+.viz-toggle {
   display: inline-flex;
   background: rgba(255, 255, 255, 0.04);
   border-radius: var(--radius-md);
@@ -136,7 +139,8 @@
 }
 
 .view-btn,
-.scale-btn {
+.scale-btn,
+.viz-btn {
   padding: 4px 10px;
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
@@ -149,13 +153,15 @@
 }
 
 .view-btn:hover,
-.scale-btn:hover {
+.scale-btn:hover,
+.viz-btn:hover {
   color: white;
   background: rgba(255, 255, 255, 0.08);
 }
 
 .view-btn.active,
-.scale-btn.active {
+.scale-btn.active,
+.viz-btn.active {
   color: white;
   background: rgba(0, 245, 255, 0.2);
   box-shadow: 0 0 8px rgba(0, 245, 255, 0.15);
@@ -186,6 +192,8 @@
 .spectrogram-overlay {
   position: relative;
   width: 100%;
+  min-height: 200px; /* TICKET 2: Ensure minimum height */
+  padding-bottom: var(--spacing-2); /* Space for x-axis */
 }
 
 /* Split view */
@@ -250,6 +258,79 @@
   min-height: 120px;
   color: var(--color-gray-500);
   font-size: var(--font-size-sm);
+}
+
+/* Spectrogram canvas container */
+.spectrogram-canvas-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.spectrogram-canvas {
+  width: 100%;
+  height: 100%;
+  border-radius: 4px;
+}
+
+/* Axis labels for spectrogram */
+.spectrogram-axis-labels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.axis-label {
+  position: absolute;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 1px 4px;
+  border-radius: 2px;
+}
+
+.axis-label.y-top {
+  top: 4px;
+  left: 4px;
+}
+
+.axis-label.y-bottom {
+  bottom: 16px;
+  left: 4px;
+}
+
+.axis-label.x-left {
+  bottom: 2px;
+  left: 4px;
+}
+
+.axis-label.x-right {
+  bottom: 2px;
+  right: 4px;
+}
+
+/* Color legend for spectrogram */
+.spectrogram-legend {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  font-size: var(--font-size-xs);
+  color: var(--color-gray-400);
+  margin-top: var(--spacing-1);
+}
+
+.legend-gradient {
+  width: 80px;
+  height: 8px;
+  border-radius: 2px;
+  background: linear-gradient(to right,
+    rgb(0, 0, 0),
+    rgb(80, 20, 100),
+    rgb(200, 50, 50),
+    rgb(255, 130, 0),
+    rgb(255, 210, 50),
+    rgb(255, 255, 255)
+  );
 }
 
 /* Footer */

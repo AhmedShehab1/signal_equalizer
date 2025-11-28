@@ -2,6 +2,7 @@
  * DualSpectrogram - Input and Output Spectrograms with Toggle
  * Shows real-time frequency analysis for both input and processed signals
  * TICKET 2: Added zoom/pan with chartjs-plugin-zoom and auto-fit to signal
+ * NEW: Added spectrogram visualization (time-frequency heatmap)
  */
 
 import { useMemo, useCallback, useState, useEffect, useRef } from 'react';
@@ -23,6 +24,7 @@ import zoomPlugin from 'chartjs-plugin-zoom';
 import { Line } from 'react-chartjs-2';
 import { stftFrames } from '../lib/stft';
 import { STFTOptions } from '../model/types';
+import { Complex } from '../lib/fft';
 import './DualSpectrogram.css';
 
 // Register Chart.js components including zoom plugin
@@ -40,6 +42,7 @@ ChartJS.register(
 );
 
 export type ScaleType = 'linear' | 'logarithmic';
+export type VisualizationType = 'spectrum' | 'spectrogram';
 
 interface DualSpectrogramProps {
   inputBuffer: AudioBuffer | null;
@@ -50,6 +53,8 @@ interface DualSpectrogramProps {
   onVisibilityChange?: (visible: boolean) => void;
   /** Chart height in pixels */
   height?: number;
+  /** TICKET 2: If true, auto-fit Y-axis on first load */
+  autoFitOnLoad?: boolean;
 }
 
 // Constants
@@ -73,9 +78,20 @@ const OUTPUT_THEME = {
   gradient: ['rgba(168, 85, 247, 0.8)', 'rgba(120, 60, 180, 0.4)', 'rgba(80, 40, 130, 0.1)'],
 };
 
+const DEFAULT_Y_DOMAIN = { min: -90, max: 100 };
+
 interface SpectrumData {
   magnitudes: Float32Array;
   frequencies: Float32Array;
+}
+
+// Spectrogram data: 2D array of magnitudes (time x frequency)
+interface SpectrogramData {
+  frames: Float32Array[]; // Each frame is magnitude values for frequency bins
+  numBins: number;
+  numFrames: number;
+  sampleRate: number;
+  duration: number;
 }
 
 // Helper function to format frequency labels
@@ -116,47 +132,197 @@ async function computeSpectrum(buffer: AudioBuffer): Promise<SpectrumData> {
   return { magnitudes: avgMagnitudes, frequencies };
 }
 
+// Compute spectrogram data from an AudioBuffer (returns magnitude frames over time)
+async function computeSpectrogram(buffer: AudioBuffer): Promise<SpectrogramData> {
+  const signal = buffer.getChannelData(0);
+  const sampleRate = buffer.sampleRate;
+  
+  const frames = await stftFrames(signal, STFT_OPTIONS, sampleRate);
+  const numBins = Math.floor(STFT_OPTIONS.fftSize / 2) + 1;
+  
+  // Convert each STFT frame to magnitude in dB
+  const magnitudeFrames: Float32Array[] = frames.map((frame: Complex[]) => {
+    const mags = new Float32Array(numBins);
+    for (let bin = 0; bin < numBins; bin++) {
+      const mag = Math.sqrt(frame[bin].re ** 2 + frame[bin].im ** 2);
+      mags[bin] = mag > 0 ? Math.max(-100, 20 * Math.log10(mag)) : -100;
+    }
+    return mags;
+  });
+  
+  return {
+    frames: magnitudeFrames,
+    numBins,
+    numFrames: magnitudeFrames.length,
+    sampleRate,
+    duration: buffer.duration,
+  };
+}
+
+// Color map for spectrogram (magnitude dB -> RGB)
+function magnitudeToColor(dB: number, minDb: number, maxDb: number): [number, number, number] {
+  // Normalize to 0-1 range
+  const normalized = Math.max(0, Math.min(1, (dB - minDb) / (maxDb - minDb)));
+  
+  // "Inferno" inspired colormap: black -> purple -> red -> orange -> yellow -> white
+  if (normalized < 0.2) {
+    const t = normalized / 0.2;
+    return [
+      Math.floor(t * 80),
+      Math.floor(t * 20),
+      Math.floor(t * 100),
+    ];
+  } else if (normalized < 0.4) {
+    const t = (normalized - 0.2) / 0.2;
+    return [
+      Math.floor(80 + t * 120),
+      Math.floor(20 + t * 30),
+      Math.floor(100 - t * 50),
+    ];
+  } else if (normalized < 0.6) {
+    const t = (normalized - 0.4) / 0.2;
+    return [
+      Math.floor(200 + t * 55),
+      Math.floor(50 + t * 80),
+      Math.floor(50 - t * 50),
+    ];
+  } else if (normalized < 0.8) {
+    const t = (normalized - 0.6) / 0.2;
+    return [
+      255,
+      Math.floor(130 + t * 80),
+      Math.floor(t * 50),
+    ];
+  } else {
+    const t = (normalized - 0.8) / 0.2;
+    return [
+      255,
+      Math.floor(210 + t * 45),
+      Math.floor(50 + t * 205),
+    ];
+  }
+}
+
+// Draw spectrogram on a canvas
+function drawSpectrogram(
+  canvas: HTMLCanvasElement,
+  data: SpectrogramData,
+  minDb: number = -80,
+  maxDb: number = 0
+): void {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  
+  const { frames, numBins, numFrames } = data;
+  
+  // Set canvas size
+  const width = canvas.clientWidth || 400;
+  const height = canvas.clientHeight || 200;
+  canvas.width = width;
+  canvas.height = height;
+  
+  // Create image data
+  const imageData = ctx.createImageData(width, height);
+  const pixels = imageData.data;
+  
+  // Scale factors
+  const xScale = numFrames / width;
+  const yScale = numBins / height;
+  
+  for (let x = 0; x < width; x++) {
+    const frameIdx = Math.min(numFrames - 1, Math.floor(x * xScale));
+    const frame = frames[frameIdx];
+    
+    for (let y = 0; y < height; y++) {
+      // Y=0 is top of canvas, but we want low frequencies at bottom
+      const binIdx = Math.min(numBins - 1, Math.floor((height - 1 - y) * yScale));
+      const mag = frame[binIdx];
+      const [r, g, b] = magnitudeToColor(mag, minDb, maxDb);
+      
+      const pixelIdx = (y * width + x) * 4;
+      pixels[pixelIdx] = r;
+      pixels[pixelIdx + 1] = g;
+      pixels[pixelIdx + 2] = b;
+      pixels[pixelIdx + 3] = 255;
+    }
+  }
+  
+  ctx.putImageData(imageData, 0, 0);
+}
+
 export default function DualSpectrogram({
   inputBuffer,
   outputBuffer,
   visible = true,
   onVisibilityChange,
   height = 200,
+  autoFitOnLoad = false,
 }: DualSpectrogramProps) {
   const [inputSpectrum, setInputSpectrum] = useState<SpectrumData | null>(null);
   const [outputSpectrum, setOutputSpectrum] = useState<SpectrumData | null>(null);
   const [scaleType, setScaleType] = useState<ScaleType>('logarithmic');
   const [isComputing, setIsComputing] = useState(false);
   const [showOverlay, setShowOverlay] = useState(true);
-  const [isAutoFit, setIsAutoFit] = useState(false);
+  const [isAutoFit, setIsAutoFit] = useState(autoFitOnLoad);
+  const [yDomain, setYDomain] = useState(DEFAULT_Y_DOMAIN);
+  
+  // Spectrogram state
+  const [visualizationType, setVisualizationType] = useState<VisualizationType>('spectrum');
+  const [inputSpectrogram, setInputSpectrogram] = useState<SpectrogramData | null>(null);
+  const [outputSpectrogram, setOutputSpectrogram] = useState<SpectrogramData | null>(null);
   
   const inputChartRef = useRef<ChartJS<'line'>>(null);
   const outputChartRef = useRef<ChartJS<'line'>>(null);
   const overlayChartRef = useRef<ChartJS<'line'>>(null);
+  const hasAutoFittedRef = useRef(false);
+  
+  // Canvas refs for spectrogram rendering
+  const inputCanvasRef = useRef<HTMLCanvasElement>(null);
+  const outputCanvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Compute input spectrum when buffer changes
+  // Compute input spectrum and spectrogram when buffer changes
   useEffect(() => {
     if (!inputBuffer) {
       setInputSpectrum(null);
+      setInputSpectrogram(null);
+      hasAutoFittedRef.current = false; // Reset for next file
+      setYDomain(DEFAULT_Y_DOMAIN);
+      setIsAutoFit(autoFitOnLoad);
       return;
     }
     
     setIsComputing(true);
-    computeSpectrum(inputBuffer)
-      .then(setInputSpectrum)
+    
+    // Compute both spectrum and spectrogram in parallel
+    Promise.all([
+      computeSpectrum(inputBuffer),
+      computeSpectrogram(inputBuffer),
+    ])
+      .then(([spectrum, spectrogram]) => {
+        setInputSpectrum(spectrum);
+        setInputSpectrogram(spectrogram);
+      })
       .catch(console.error)
       .finally(() => setIsComputing(false));
   }, [inputBuffer]);
 
-  // Compute output spectrum when buffer changes
+
+  // Compute output spectrum and spectrogram when buffer changes
   useEffect(() => {
     if (!outputBuffer) {
       setOutputSpectrum(null);
+      setOutputSpectrogram(null);
       return;
     }
     
-    computeSpectrum(outputBuffer)
-      .then(setOutputSpectrum)
+    Promise.all([
+      computeSpectrum(outputBuffer),
+      computeSpectrogram(outputBuffer),
+    ])
+      .then(([spectrum, spectrogram]) => {
+        setOutputSpectrum(spectrum);
+        setOutputSpectrogram(spectrogram);
+      })
       .catch(console.error);
   }, [outputBuffer]);
 
@@ -246,8 +412,19 @@ export default function DualSpectrogram({
   const inputProcessed = useMemo(() => processData(inputSpectrum, sampleRate), [inputSpectrum, sampleRate, processData]);
   const outputProcessed = useMemo(() => processData(outputSpectrum, sampleRate), [outputSpectrum, sampleRate, processData]);
 
+  const allMagnitudes = useMemo(() => {
+    const values: number[] = [];
+    if (inputProcessed) {
+      values.push(...inputProcessed.data);
+    }
+    if (outputProcessed) {
+      values.push(...outputProcessed.data);
+    }
+    return values;
+  }, [inputProcessed, outputProcessed]);
+
   // Chart options factory with zoom/pan support
-  const createChartOptions = useCallback((theme: typeof INPUT_THEME, frequencies: number[]): ChartOptions<'line'> => ({
+  const createChartOptions = useCallback((theme: typeof INPUT_THEME, frequencies: number[], domain: typeof DEFAULT_Y_DOMAIN): ChartOptions<'line'> => ({
     responsive: true,
     maintainAspectRatio: false,
     animation: { duration: 150 },
@@ -301,7 +478,7 @@ export default function DualSpectrogram({
           mode: 'xy',
         },
         limits: {
-          y: { min: -100, max: 10 },
+          y: { min: -120, max: 20 }, // Extended range for hot signals
         },
       },
     },
@@ -326,8 +503,8 @@ export default function DualSpectrogram({
           font: { size: 9 },
         },
         grid: { color: 'rgba(255, 255, 255, 0.05)' },
-        min: -80,
-        max: 0,
+        min: domain.min,
+        max: domain.max,
       },
     },
   }), []);
@@ -408,13 +585,52 @@ export default function DualSpectrogram({
     let min = Math.min(...data);
     let max = Math.max(...data);
     
-    // Add 5% padding
+    // Add 10% padding for better visibility
     const range = max - min || 10;
-    min = Math.max(-100, min - range * 0.05);
-    max = Math.min(10, max + range * 0.05);
+    min = Math.max(-100, min - range * 0.1);
+    max = Math.min(20, max + range * 0.1); // TICKET 2: Allow up to +20dB for hot signals
+    
+    // Ensure minimum visible range
+    if (max - min < 20) {
+      const center = (min + max) / 2;
+      min = center - 10;
+      max = center + 10;
+    }
     
     return { min, max };
   }, []);
+
+  // Auto-fit once when requested and data available
+  useEffect(() => {
+    if (!autoFitOnLoad || hasAutoFittedRef.current) return;
+    if (allMagnitudes.length === 0) return;
+    setIsAutoFit(true);
+    setYDomain(computeYAxisLimits(allMagnitudes));
+    hasAutoFittedRef.current = true;
+  }, [autoFitOnLoad, allMagnitudes, computeYAxisLimits]);
+
+  // Keep auto-fit domain updated as new spectra arrive
+  useEffect(() => {
+    if (!isAutoFit) return;
+    if (allMagnitudes.length === 0) return;
+    const nextDomain = computeYAxisLimits(allMagnitudes);
+    setYDomain(prev => {
+      const delta = Math.abs(prev.min - nextDomain.min) + Math.abs(prev.max - nextDomain.max);
+      return delta > 0.5 ? nextDomain : prev;
+    });
+  }, [isAutoFit, allMagnitudes, computeYAxisLimits]);
+
+  // Draw spectrograms when in spectrogram mode and data is available
+  useEffect(() => {
+    if (visualizationType !== 'spectrogram' || showOverlay) return;
+    
+    if (inputCanvasRef.current && inputSpectrogram) {
+      drawSpectrogram(inputCanvasRef.current, inputSpectrogram, yDomain.min, yDomain.max);
+    }
+    if (outputCanvasRef.current && outputSpectrogram) {
+      drawSpectrogram(outputCanvasRef.current, outputSpectrogram, yDomain.min, yDomain.max);
+    }
+  }, [visualizationType, showOverlay, inputSpectrogram, outputSpectrogram, yDomain]);
 
   // Reset zoom on all charts
   const handleResetZoom = useCallback(() => {
@@ -422,22 +638,21 @@ export default function DualSpectrogram({
     inputChartRef.current?.resetZoom();
     outputChartRef.current?.resetZoom();
     setIsAutoFit(false);
+    setYDomain(DEFAULT_Y_DOMAIN);
   }, []);
 
   // Auto-fit to signal range
   const handleAutoFit = useCallback(() => {
+    if (allMagnitudes.length === 0) {
+      setYDomain(DEFAULT_Y_DOMAIN);
+      setIsAutoFit(false);
+      return;
+    }
     setIsAutoFit(true);
-    // The chart options will use computed limits when isAutoFit is true
-  }, []);
+    setYDomain(computeYAxisLimits(allMagnitudes));
+  }, [allMagnitudes, computeYAxisLimits]);
 
   const overlayChartOptions = useMemo((): ChartOptions<'line'> => {
-    // Compute Y limits when auto-fit is enabled
-    const allData = [
-      ...(inputProcessed?.data || []),
-      ...(outputProcessed?.data || []),
-    ];
-    const yLimits = isAutoFit ? computeYAxisLimits(allData) : { min: -80, max: 0 };
-    
     return {
       responsive: true,
       maintainAspectRatio: false,
@@ -489,7 +704,7 @@ export default function DualSpectrogram({
             mode: 'xy',
           },
           limits: {
-            y: { min: -100, max: 10 },
+            y: { min: -120, max: 20 }, // Extended range for hot signals
           },
         },
       },
@@ -526,12 +741,12 @@ export default function DualSpectrogram({
             font: { size: 9 },
           },
           grid: { color: 'rgba(255, 255, 255, 0.05)' },
-          min: yLimits.min,
-          max: yLimits.max,
+          min: yDomain.min,
+          max: yDomain.max,
         },
       },
     };
-  }, [scaleType, inputProcessed, outputProcessed, isAutoFit, computeYAxisLimits]);
+  }, [scaleType, yDomain]);
 
   const handleToggle = useCallback(() => {
     onVisibilityChange?.(!visible);
@@ -577,6 +792,26 @@ export default function DualSpectrogram({
               🔄 Reset
             </button>
           </div>
+          
+          {/* Visualization type toggle - only visible in Split mode */}
+          {!showOverlay && (
+            <div className="viz-toggle">
+              <button
+                className={`viz-btn ${visualizationType === 'spectrum' ? 'active' : ''}`}
+                onClick={() => setVisualizationType('spectrum')}
+                title="Frequency spectrum (magnitude vs frequency)"
+              >
+                📈 Spectrum
+              </button>
+              <button
+                className={`viz-btn ${visualizationType === 'spectrogram' ? 'active' : ''}`}
+                onClick={() => setVisualizationType('spectrogram')}
+                title="Spectrogram (time-frequency heatmap)"
+              >
+                🌡️ Spectrogram
+              </button>
+            </div>
+          )}
           
           {/* View mode toggle */}
           <div className="view-toggle">
@@ -639,14 +874,33 @@ export default function DualSpectrogram({
               Input Signal
             </div>
             <div className="chart-container" style={{ height: height - 24 }}>
-              {inputProcessed ? (
-                <Line
-                  ref={inputChartRef}
-                  data={createChartData(inputProcessed, INPUT_THEME)}
-                  options={createChartOptions(INPUT_THEME, inputProcessed.frequencies)}
-                />
+              {visualizationType === 'spectrum' ? (
+                inputProcessed ? (
+                  <Line
+                    ref={inputChartRef}
+                    data={createChartData(inputProcessed, INPUT_THEME)}
+                    options={createChartOptions(INPUT_THEME, inputProcessed.frequencies, yDomain)}
+                  />
+                ) : (
+                  <div className="spectrogram-empty">No input</div>
+                )
               ) : (
-                <div className="spectrogram-empty">No input</div>
+                inputSpectrogram ? (
+                  <div className="spectrogram-canvas-container">
+                    <canvas 
+                      ref={inputCanvasRef} 
+                      className="spectrogram-canvas"
+                    />
+                    <div className="spectrogram-axis-labels">
+                      <span className="axis-label y-top">{formatFrequencyLabel(inputSpectrogram.sampleRate / 2, true)}</span>
+                      <span className="axis-label y-bottom">0 Hz</span>
+                      <span className="axis-label x-left">0s</span>
+                      <span className="axis-label x-right">{inputSpectrogram.duration.toFixed(2)}s</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="spectrogram-empty">No input</div>
+                )
               )}
             </div>
           </div>
@@ -657,16 +911,37 @@ export default function DualSpectrogram({
               Output Signal (EQ Applied)
             </div>
             <div className="chart-container" style={{ height: height - 24 }}>
-              {outputProcessed ? (
-                <Line
-                  ref={outputChartRef}
-                  data={createChartData(outputProcessed, OUTPUT_THEME)}
-                  options={createChartOptions(OUTPUT_THEME, outputProcessed.frequencies)}
-                />
+              {visualizationType === 'spectrum' ? (
+                outputProcessed ? (
+                  <Line
+                    ref={outputChartRef}
+                    data={createChartData(outputProcessed, OUTPUT_THEME)}
+                    options={createChartOptions(OUTPUT_THEME, outputProcessed.frequencies, yDomain)}
+                  />
+                ) : (
+                  <div className="spectrogram-empty">
+                    {inputBuffer ? 'Apply EQ to see output' : 'No output'}
+                  </div>
+                )
               ) : (
-                <div className="spectrogram-empty">
-                  {inputBuffer ? 'Apply EQ to see output' : 'No output'}
-                </div>
+                outputSpectrogram ? (
+                  <div className="spectrogram-canvas-container">
+                    <canvas 
+                      ref={outputCanvasRef} 
+                      className="spectrogram-canvas"
+                    />
+                    <div className="spectrogram-axis-labels">
+                      <span className="axis-label y-top">{formatFrequencyLabel(outputSpectrogram.sampleRate / 2, true)}</span>
+                      <span className="axis-label y-bottom">0 Hz</span>
+                      <span className="axis-label x-left">0s</span>
+                      <span className="axis-label x-right">{outputSpectrogram.duration.toFixed(2)}s</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="spectrogram-empty">
+                    {inputBuffer ? 'Apply EQ to see output' : 'No output'}
+                  </div>
+                )
               )}
             </div>
           </div>
@@ -675,11 +950,23 @@ export default function DualSpectrogram({
       
       <div className="spectrogram-footer">
         <span className="info-text">
-          {scaleType === 'logarithmic' ? '📐 Log' : '📏 Linear'}
-          {' · '}
-          {LOG_MIN_FREQ} Hz - {formatFrequencyLabel((sampleRate / 2), true)}
-          {' · '}
-          <span className="zoom-hint">Drag to zoom • Scroll to zoom • Shift+drag to pan</span>
+          {!showOverlay && visualizationType === 'spectrogram' ? (
+            <>
+              🌡️ Spectrogram
+              {' · '}
+              X: Time · Y: Frequency · Color: Amplitude
+              {' · '}
+              {yDomain.min.toFixed(0)} to {yDomain.max.toFixed(0)} dB
+            </>
+          ) : (
+            <>
+              {scaleType === 'logarithmic' ? '📐 Log' : '📏 Linear'}
+              {' · '}
+              {LOG_MIN_FREQ} Hz - {formatFrequencyLabel((sampleRate / 2), true)}
+              {' · '}
+              <span className="zoom-hint">Drag to zoom • Scroll to zoom • Shift+drag to pan</span>
+            </>
+          )}
         </span>
         <span className="sample-rate">Fs: {sampleRate} Hz</span>
       </div>
