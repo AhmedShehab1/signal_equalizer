@@ -218,13 +218,17 @@
 }
 
 /* ===== SPECTRUM SECTION - DUAL SPECTROGRAM ===== */
+/* TICKET 2: Give spectrum more vertical space and proper stacking */
 .eq-spectrum-section {
   flex-shrink: 0;
+  margin-bottom: var(--spacing-3); /* Prevent overlap with row below */
+  padding-bottom: var(--spacing-2);
 }
 
 .eq-spectrum-section--expanded {
-  flex: 1;
-  min-height: 250px;
+  flex: 1 1 auto;
+  min-height: 320px; /* Increased from 250px for better signal visibility */
+  max-height: 45vh; /* Cap at 45% viewport height */
 }
 
 .eq-spectrum-placeholder {
@@ -237,6 +241,7 @@
 }
 
 /* ===== COMBINED ROW - Waveform + Controls Side by Side ===== */
+/* TICKET 2: Ensure row doesn't overlap spectrum */
 .eq-combined-row {
   display: grid;
   grid-template-columns: 1fr 1fr;

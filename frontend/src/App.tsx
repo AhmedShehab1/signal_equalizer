@@ -50,6 +50,9 @@ function App() {
   // Customized mode state (slider scales for current mode)
   const [customModeBandSpecs, setCustomModeBandSpecs] = useState<BandSpec[]>([]);
   
+  // TICKET 1: Separate state for Advanced DSP bands - persists across tab switches
+  const [advancedDspBands, setAdvancedDspBands] = useState<BandSpec[]>([]);
+  
   // AI separation cache - persists across tab switches
   const [aiSeparationCache, setAISeparationCache] = useState<AISeparationCache | null>(null);
   
@@ -340,9 +343,24 @@ function App() {
     }
   };
 
-  // Handle custom mode tab switching
-  const handleCustomModeTabChange = (tab: 'dsp' | 'ai') => {
+  // TICKET 1: Handle custom mode tab switching WITHOUT triggering processing
+  const handleCustomModeTabChange = async (tab: 'dsp' | 'ai') => {
+    // Save current DSP bands before switching away from DSP tab
+    if (customModeTab === 'dsp' && tab === 'ai') {
+      setAdvancedDspBands(customModeBandSpecs);
+    }
+    
     setCustomModeTab(tab);
+    
+    // Restore DSP bands when switching back to DSP tab (without reprocessing)
+    if (tab === 'dsp' && advancedDspBands.length > 0) {
+      setCustomModeBandSpecs(advancedDspBands);
+      // Only recompute if bands actually exist
+      if (originalBuffer) {
+        await runRecompute(advancedDspBands);
+      }
+    }
+    // When switching to AI tab, don't clear anything - AI handles its own state
   };
 
   const handleModeSwitch = async (mode: AppMode) => {
@@ -443,14 +461,15 @@ function App() {
                 />
               </section>
 
-              {/* DUAL SPECTROGRAM - Input & Output with Toggle - MORE VERTICAL SPACE */}
+              {/* DUAL SPECTROGRAM - Input & Output with Toggle - TICKET 2: MORE VERTICAL SPACE */}
               <section className="eq-spectrum-section eq-spectrum-section--expanded">
                 <DualSpectrogram
                   inputBuffer={originalBuffer}
                   outputBuffer={processedBuffer}
                   visible={showSpectrograms}
                   onVisibilityChange={setShowSpectrograms}
-                  height={240}
+                  height={320}
+                  autoFitOnLoad={true}
                 />
               </section>
 
