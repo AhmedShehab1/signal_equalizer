@@ -2,7 +2,7 @@
 
 An elegant, professional audio equalizer and analysis toolkit with real-time visualizations, multi-mode equalization, and AI-powered source separation. Built for audio engineers, researchers, and developers who value transparent DSP implementations and reproducible results.
 
-> Pro tip: Add your screen recordings to `docs/demos/` and embed them here for a polished project showcase.
+
 
 ## Table of Contents
 - **Overview**
