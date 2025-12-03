@@ -41,21 +41,16 @@ This repository is organized into:
 <tr>
 <td>
 
-https://github.com/user-attachments/assets/YOUR_VIDEO_1_ID
+https://github.com/user-attachments/assets/9bb6cda5-86f9-4f22-87ce-630be17a64b1
 
 </td>
 <td>
 
-https://github.com/user-attachments/assets/YOUR_VIDEO_2_ID
+https://github.com/user-attachments/assets/5664f399-5783-4a01-80d7-d879eecaac6d
 
 </td>
 </tr>
 </table>
-
-> **To add your recordings:**
-> 1. Copy your Screen Studio `.mp4` files into `docs/demos/`
-> 2. Push to GitHub, then drag-drop the videos into a GitHub issue or PR description
-> 3. GitHub will generate embed URLs — replace `YOUR_VIDEO_1_ID` and `YOUR_VIDEO_2_ID` above
 
 ---
 
