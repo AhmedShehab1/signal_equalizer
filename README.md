@@ -1,8 +1,189 @@
 # Signal Equalizer
 
-A full-stack audio equalizer application with real-time visualization, multiple preset modes, and **AI-powered source separation**.
+An elegant, professional audio equalizer and analysis toolkit with real-time visualizations, multi-mode equalization, and AI-powered source separation. Built for audio engineers, researchers, and developers who value transparent DSP implementations and reproducible results.
 
-> **🎵 NEW in Phase 6**: AI Source Separation using Hybrid Demucs! Separate any song into drums, bass, vocals, and other instruments. [See docs](./docs/PHASE6_AI_INTEGRATION.md)
+> Pro tip: Add your screen recordings to `docs/demos/` and embed them here for a polished project showcase.
+
+## Table of Contents
+- **Overview**
+- **Quick demo**
+- **Highlights**
+- **Quick start**
+- **Development & testing**
+- **Architecture & technical details**
+- **Usage**
+- **Troubleshooting**
+- **Contributing**
+- **License & contact**
+
+---
+
+## Overview
+
+Signal Equalizer is a monorepo combining a modern React + TypeScript frontend with a Python FastAPI backend (optional AI features). Core capabilities include STFT-based equalization, interactive spectrum/spectrogram visualizations, and AI-based source separation (Hybrid Demucs).
+
+This repository is organized into:
+
+- `frontend/` — React app (Vite, TypeScript)
+- `backend/`  — FastAPI app (Python 3.11+, AI endpoints)
+- `docs/`     — Implementation notes, architecture, and demos
+- `test_assets/` — Example audio files used in tests
+
+---
+
+## Quick demo
+
+<table>
+<tr>
+<td align="center"><strong>Demo 1</strong></td>
+<td align="center"><strong>Demo 2</strong></td>
+</tr>
+<tr>
+<td>
+
+https://github.com/user-attachments/assets/YOUR_VIDEO_1_ID
+
+</td>
+<td>
+
+https://github.com/user-attachments/assets/YOUR_VIDEO_2_ID
+
+</td>
+</tr>
+</table>
+
+> **To add your recordings:**
+> 1. Copy your Screen Studio `.mp4` files into `docs/demos/`
+> 2. Push to GitHub, then drag-drop the videos into a GitHub issue or PR description
+> 3. GitHub will generate embed URLs — replace `YOUR_VIDEO_1_ID` and `YOUR_VIDEO_2_ID` above
+
+---
+
+## Highlights
+
+- **Real-time EQ**: STFT (2048/512) with WOLA reconstruction.
+- **Spectrogram & spectrum**: Toggle between frequency spectrum and spectrogram (canvas-based rendering).
+- **AI source separation**: Hybrid Demucs endpoints for vocals/instruments separation.
+- **Linked views**: Input/output waveform viewers with shared pan/zoom and cursor sync.
+- **Accessibility**: Keyboard-friendly controls and ARIA labeling.
+
+---
+
+## Quick start
+
+Prerequisites: `Node.js 16+` for frontend, `Python 3.11+` for optional backend AI features.
+
+Frontend (dev):
+
+```bash
+cd frontend
+npm install
+npm run dev
+# Open http://localhost:5173
+```
+
+Backend (AI, optional):
+
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+python -m app.main
+# API docs: http://localhost:8000/docs
+```
+
+Production build (frontend):
+
+```bash
+cd frontend
+npm run build
+npm run preview
+```
+
+---
+
+## Development & testing
+
+- Frontend tests (Vitest):
+
+```bash
+cd frontend
+npm test
+```
+
+- Backend tests (pytest):
+
+```bash
+cd backend
+pytest -q
+```
+
+- Linters & formatters:
+
+```bash
+cd frontend && npm run lint
+cd backend  && black app/ tests/ && flake8 app/
+```
+
+---
+
+## Architecture & technical details
+
+- **Frontend**: React + TypeScript, Vite build system, Canvas visualizations for spectrogram and fast rendering.
+- **DSP**: STFT with Hann window (window size `2048`, hop `512`), product-of-scales gain handling for overlapping bands, WOLA overlap-add synthesis.
+- **AI**: Hybrid Demucs model running in `backend/app/services/demucs_service.py` (PyTorch). Model endpoints return separated stems and optional spectrogram images.
+
+Key implementation details:
+
+- Window: Hann
+- Window size: `2048`
+- Hop: `512`
+- Spectrogram dynamic range: `80 dB`
+
+---
+
+## Usage
+
+- Load an audio file using the File Loader in the UI.
+- Choose a mode: `Preset`, `Generic`, or `Customized`.
+- Tweak band gains, solo/mute sources, and preview the mixed output in real time.
+- Use the spectrogram view for time-frequency inspection and the linked viewers for comparison.
+
+---
+
+## Troubleshooting
+
+- Spectrograms appear clipped: confirm STFT params (window/hop) match processing pipeline.
+- AI model errors: ensure CUDA/PyTorch compatibility if running GPU inference. Check `backend/requirements.txt`.
+
+If you run into issues open an issue with the reproduction steps and a sample audio file where possible.
+
+---
+
+## Contributing
+
+- Fork the repo, create a feature branch, run unit tests, and open a PR.
+- Include screenshots/GIFs or the demo recordings to clarify UI changes.
+
+For major features, open an issue first to discuss design.
+
+---
+
+## License & contact
+
+- License: MIT
+- Maintainer: Ahmed Shehab (add email or GitHub handle here if you want contact info)
+
+---
+
+Would you like me to:
+
+- Add the two Screen Studio recordings to `docs/demos/` and embed them here?
+- Create a short GIF preview for the README hero banner?
+- Commit this change to a branch and open a PR for review?
+
+Tell me which next step you'd prefer and I'll proceed.
 
 ## Architecture
 
