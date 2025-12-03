@@ -221,13 +221,13 @@
 /* TICKET 2: Give spectrum more vertical space and proper stacking */
 .eq-spectrum-section {
   flex-shrink: 0;
-  margin-bottom: var(--spacing-3); /* Prevent overlap with row below */
-  padding-bottom: var(--spacing-2);
+  margin-bottom: var(--spacing-20); /* Prevent overlap with row below */
+  padding-bottom: var(--spacing-10);
 }
 
 .eq-spectrum-section--expanded {
   flex: 1 1 auto;
-  min-height: 320px; /* Increased from 250px for better signal visibility */
+  min-height: 350px; /* Increased from 250px for better signal visibility */
   max-height: 45vh; /* Cap at 45% viewport height */
 }
 

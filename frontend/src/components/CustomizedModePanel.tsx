@@ -284,7 +284,10 @@ export default function CustomizedModePanel({
       
       if ((speechResult || musicResult) && Object.keys(sourceBuffers).length > 0 && onAudioMixed) {
         try {
-          const mixed = mixSources(sourceBuffers, updated, audioContext);
+          // Apply solo/mute state to effective gains
+          const allSourceKeys = Object.keys(sourceBuffers);
+          const effectiveGains = calculateEffectiveGains(allSourceKeys, updated, soloedSources, mutedSources);
+          const mixed = mixSources(sourceBuffers, effectiveGains, audioContext);
           onAudioMixed(mixed);
         } catch (err) {
           console.error('[handleSourceGainChange] Failed to remix:', err);
@@ -339,6 +342,19 @@ export default function CustomizedModePanel({
       } else {
         next.add(sourceKey);
       }
+      
+      // Remix with effective gains accounting for solo state
+      if ((speechResult || musicResult) && Object.keys(sourceBuffers).length > 0 && onAudioMixed) {
+        const allSourceKeys = Object.keys(sourceBuffers);
+        const effectiveGains = calculateEffectiveGains(allSourceKeys, sourceGains, next, mutedSources);
+        try {
+          const mixed = mixSources(sourceBuffers, effectiveGains, audioContext);
+          onAudioMixed(mixed);
+        } catch (err) {
+          console.error('[handleSoloToggle] Failed to remix:', err);
+        }
+      }
+      
       return next;
     });
   };
@@ -351,8 +367,52 @@ export default function CustomizedModePanel({
       } else {
         next.add(sourceKey);
       }
+      
+      // Remix with effective gains accounting for mute state
+      if ((speechResult || musicResult) && Object.keys(sourceBuffers).length > 0 && onAudioMixed) {
+        const allSourceKeys = Object.keys(sourceBuffers);
+        const effectiveGains = calculateEffectiveGains(allSourceKeys, sourceGains, soloedSources, next);
+        try {
+          const mixed = mixSources(sourceBuffers, effectiveGains, audioContext);
+          onAudioMixed(mixed);
+        } catch (err) {
+          console.error('[handleMuteToggle] Failed to remix:', err);
+        }
+      }
+      
       return next;
     });
+  };
+  
+  // Calculate effective gains considering solo and mute states
+  const calculateEffectiveGains = (
+    sourceKeys: string[],
+    baseGains: Record<string, number>,
+    soloed: Set<string>,
+    muted: Set<string>
+  ): Record<string, number> => {
+    const effectiveGains: Record<string, number> = {};
+    const hasSoloedSources = soloed.size > 0;
+    
+    for (const key of sourceKeys) {
+      // If any source is soloed, only soloed sources play
+      if (hasSoloedSources) {
+        if (soloed.has(key) && !muted.has(key)) {
+          effectiveGains[key] = baseGains[key] ?? 1.0;
+        } else {
+          effectiveGains[key] = 0;
+        }
+      } else {
+        // No solos active - just apply mutes
+        if (muted.has(key)) {
+          effectiveGains[key] = 0;
+        } else {
+          effectiveGains[key] = baseGains[key] ?? 1.0;
+        }
+      }
+    }
+    
+    return effectiveGains;
   };
 
   const stopPlayback = () => {
